@@ -1,8 +1,12 @@
 ﻿using System;
 using System.Drawing;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Reflection.Metadata.Ecma335;
 using System.Runtime.InteropServices;
+using System.Security;
+using System.Collections;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.VisualBasic;
@@ -11,9 +15,9 @@ using NAudio.Codecs;
 using NAudio.Dmo;
 using NAudio.Wave;
 using static System.Net.Mime.MediaTypeNames;
-using static HexerDexer.Program;
+using static Castaway.Program;
 
-namespace HexerDexer;
+namespace Castaway;
 public class LoopStream : WaveStream
 {
     WaveStream sourceStream;
@@ -95,12 +99,12 @@ public class WavePlayer
 public class AudioEngine
 {
     public static string[][] Tracks = new string[][] {
-        new string[5] {"001-guitar.wav",        // Hex -> Dec
+        new string[5] {"001-guitar.wav",
                        "002-bass.wav",
                        "003-tambourine.wav",
                        "004-atmpospherics.wav",
                        "005-drums.wav" },
-        new string[7] {"song-001.wav",          // Dec -> Hex
+        new string[7] {"song-001.wav",
                        "song-002.wav",
                        "song-003.wav",
                        "song-004.wav",
@@ -188,6 +192,7 @@ class Program
         public int Count { get { return ConsoleHistory.Count; } }
         public void Log(ConsoleMessage message) { ConsoleHistory.Add(message); }
         public void Clear() { ConsoleHistory.Clear(); }
+        public void Clear(int yMin) { ConsoleHistory.RemoveAll(s => s.YVal > yMin); }
         public void Remove(int x, int y)
         {
             ConsoleMessage? removeMe = new ConsoleMessage { XVal = -1 }; // fake item that can't exist, so nothing will be removed if item is not found
@@ -230,12 +235,6 @@ class Program
             {
                 if (log.Contents == oldSpeaker && log.XVal == 0)
                 {
-                    //    |->
-                    // You: hello
-                    // 012345->
-                    // Hippo: hello
-                    // 01234567->
-
                     int msgShift = newSpeaker.Length - oldSpeaker.Length;
 
                     TheConsole.Shift(oldSpeaker.Length, log.YVal, msgShift); // move message contents to align
@@ -246,6 +245,11 @@ class Program
         public static void Clear()
         {
             TheConsole.Clear();
+            Console.Clear();
+        }
+        public static void Clear(int yMin)
+        {
+            TheConsole.Clear(yMin);
             Console.Clear();
         }
         public static void Refresh(ConsoleLogs? extraMessages = null)
@@ -328,6 +332,11 @@ class Program
 
         Print(contents, newLines, x, y, highlight, sleep, msgColor);
     }
+    public static void Narrate(string contents, int newLines = 1, int x = -1, int y = -1, ConsoleColor msgColor = ConsoleColor.Gray, ConsoleColor highlight = ConsoleColor.Black, int sleep = 84)
+    {
+        Print(contents, newLines, x, y, highlight, sleep, msgColor);
+    }
+
     static void CenterScreen(string title, string subtitle = "", int? time = null, string audioLocation = "")
     {
         Console.ForegroundColor = ConsoleColor.White;
@@ -359,7 +368,7 @@ class Program
             AudioEngine.PlayMusic(audioLocation);
         }
 
-        if (time.HasValue) { System.Threading.Thread.Sleep(time.Value); }
+        if (time.HasValue) { Thread.Sleep(time.Value); }
         else
         {
             while (true)
@@ -461,7 +470,7 @@ class Program
     {
         while (true)
         {
-            if (pointer) { Print("§(14)> ", newLines: 0, x: xCoord, y: yCoord); } 
+            if (pointer) { Print("§(14)> ", newLines: 0, x: xCoord, y: yCoord); }
             string uInput = ReadChars();
             int len = uInput.Length;
             if (0 < len && (maxLength == -1 || len <= maxLength)) // insert more logical checks like is alphanumeric
@@ -475,52 +484,318 @@ class Program
         }
     }
 
+    /* Choose() Using Prints, but unnecassary as only appearing for a frame, thus Console.WriteLine() is MUCH faster
+    static int Choose(string[] options)
+    {
+        Print("Hello");
+        int choice = 0;
+        bool chosen = false;
+        while (!chosen)
+        {
+            Console.CursorVisible = false;
+            int xIndent = (Console.WindowWidth / 2) - (options.Sum(o => o.Length + 10) / 2);
+            int yIndent = Console.WindowHeight - (3 + 3);
+
+            // write all options with current selected highlighted
+            for (int i = 0; i < options.Length; i++)
+            {
+                Print(new String('-', options[i].Length + 4), 1, xIndent, yIndent);
+                Print("|", 0, xIndent);
+                if (choice == i) { Print($"§(14){options[i]}", 0, xIndent+2, highlight: ConsoleColor.DarkGray); }
+                else             { Print(options[i], 0, xIndent+2); }
+                Print("|", 1, xIndent + options[i].Length + 3);
+                Print(new String('-', options[i].Length + 4), 0, xIndent);
+
+                xIndent += options[i].Length + 10;
+            }
+
+            switch (Console.ReadKey(true).Key)
+            {
+                case ConsoleKey.RightArrow: if (choice < options.Length - 1) {
+                        choice++;
+                        MainConsole.Clear(yIndent);
+                        MainConsole.Refresh();
+                    }; break;
+                case ConsoleKey.LeftArrow: if (choice > 0) {
+                        choice--;
+                        MainConsole.Clear(yIndent);
+                        MainConsole.Refresh();
+                    } break;
+                case ConsoleKey.Enter: chosen = true; break;
+            }
+            Console.CursorVisible = true;
+        }
+
+        return choice;
+    }
+    */
+    static int Choose(string[] options)
+    {
+        int choice = 0;
+        int indent = (Console.WindowWidth / 2) - (options.Sum(o => o.Length + 10) / 2);
+        int xIndent = indent;
+        int yIndent = Console.WindowHeight - (3 + 3);
+        bool chosen = false;
+        while (!chosen)
+        {
+            Console.CursorVisible = false;
+            xIndent = indent;
+
+            // write all options with current selected highlighted
+            for (int i = 0; i < options.Length; i++)
+            {
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.BackgroundColor = ConsoleColor.Black;
+                Console.SetCursorPosition(xIndent, yIndent);
+                Console.WriteLine(new String('-', options[i].Length + 4));
+                Console.SetCursorPosition(xIndent, yIndent+1);
+                Console.Write("| ");
+                if (choice == i)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.BackgroundColor = ConsoleColor.DarkGray;
+                    Console.Write(options[i]);
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.BackgroundColor = ConsoleColor.Black;
+                }
+                else
+                {
+                    Console.Write(options[i]);
+                }
+                Console.WriteLine(" |");
+                Console.SetCursorPosition(xIndent, yIndent + 2);
+                Console.Write(new String('-', options[i].Length + 4));
+
+                xIndent += options[i].Length + 10;
+            }
+
+            switch (Console.ReadKey(true).Key)
+            {
+                case ConsoleKey.RightArrow:
+                    if (choice < options.Length - 1)
+                    {
+                        choice++;
+                        Console.Clear();
+                        MainConsole.Refresh();
+                    }; break;
+                case ConsoleKey.LeftArrow:
+                    if (choice > 0)
+                    {
+                        choice--;
+                        Console.Clear();
+                        MainConsole.Refresh();
+                    }
+                    break;
+                case ConsoleKey.Enter: chosen = true; break;
+            }
+            Console.CursorVisible = true;
+        }
+
+        return choice;
+    }
+
+    static void CenterText(string[] input, int? time = null, int marginTop = 10, string audioLocation = "", Dictionary<int, int>? colors = null )
+    {
+        if (colors == null)
+        {
+            for (int i = 0; i < input.Length; i++)
+            {
+                Print(input[i], 1, (Console.WindowWidth - input[i].Length) / 2, marginTop + i);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < input.Length; i++)
+            {
+                if (colors.ContainsKey(i))
+                {
+                    Print($"§({colors[i]}){input[i]}", 1, (Console.WindowWidth - input[i].Length) / 2, marginTop + i);
+                }
+                else
+                {
+                    Print(input[i], 1, (Console.WindowWidth - input[i].Length) / 2, marginTop + i);
+                }
+            }
+        }
+        Console.SetCursorPosition(Console.WindowWidth / 2, Console.WindowHeight - 10);
+
+        // Music & wait for keypress
+        if (audioLocation != "")
+        {
+            AudioEngine.PlayMusic(audioLocation);
+        }
+
+        if (time.HasValue)
+        {
+            Thread.Sleep(time.Value);
+        }
+
+        else
+        {
+            while (true)
+            {
+                if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Enter)
+                {
+                    AudioEngine.StopMusic();
+                    break;
+                }
+            }
+        }
+    }
+
+    static void DigArt(int artChoice, int speed = 150)
+    {
+        string art = string.Empty;
+        bool center = false;
+
+        switch (artChoice)
+        {
+            case 0: center = true; art = @"
+
+██████╗ █████╗ ███████╗████████╗ █████╗ ██╗    ██╗ █████╗ ██╗   ██╗
+██╔════╝██╔══██╗██╔════╝╚══██╔══╝██╔══██╗██║    ██║██╔══██╗╚██╗ ██╔╝
+██║     ███████║███████╗   ██║   ███████║██║ █╗ ██║███████║ ╚████╔╝ 
+██║     ██╔══██║╚════██║   ██║   ██╔══██║██║███╗██║██╔══██║  ╚██╔╝  
+╚██████╗██║  ██║███████║   ██║   ██║  ██║╚███╔███╔╝██║  ██║   ██║   
+╚═════╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝   
+                                                            "; break;
+        }
+
+        if (center)
+        {
+            using (StringReader reader = new StringReader(art))
+            {
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    int cursorPos = (Console.WindowWidth - line.Length) / 2;
+                    Print(line, 1, cursorPos);
+                    Thread.Sleep(speed);
+                }
+            }
+        }
+        else
+        {
+            using (StringReader reader = new StringReader(art))
+            {
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    Print(line);
+                }
+            }
+        }
+    }
 
 
     static string name = "You";
+    static Dictionary<string, int> inventory = new Dictionary<string, int> { { "Gold", 25 }, { "Coconuts", 0 } };
     static void Prologue()
     {
+        MainConsole.Clear();
+        Narrate("17:23. Ocean Atlantic Cruise", 2);
         Say("Dave", "Ha, good one Greg!");
         Say("Greg", "I know right, I'm a real comedian!");
-        Say( name,  "Um, actually that wasn't that funny...", msgColor: ConsoleColor.Yellow);
+        Say(name, "Um, actually that wasn't that funny...", msgColor: ConsoleColor.Yellow);
         Say("Greg", "What? Who's this kid?");
-        Say( name,  "Close your mouth! The name's ", 0, msgColor: ConsoleColor.Yellow); 
-        
+        Say(name, "Close your mouth! The name's ", 0, msgColor: ConsoleColor.Yellow);
+
         name = ReadStr();
         MainConsole.UpdateSpeaker("You", name);
         MainConsole.Refresh();
-        Print($"§(14){name}.");
+        Narrate($"§(14){name}.");
 
         Say("Greg", "What a ridiculous name.");
         Say("Dave", $"Hey, {name}'s my best friend!");
         Say("Greg", "...", sleep: 200);
         Say("Dave", "...", sleep: 200);
         Say("Dave", $"LOL! Just kidding! Bye, {name}!");
-        Print("§(8)Dave pushes you off the ship.", sleep: 84);
-        Print("§(8)You fall.", sleep: 84);
-        Print("§(8)You survive.", sleep:84);
-        Print("§(8)With a minor major interior exterior concussion.", sleep: 84);
+        Narrate("Dave pushes you off the ship.");
+        Narrate("You fall.");
+        Narrate("You survive.");
+        Narrate("With a minor major interior exterior concussion.");
         Thread.Sleep(1500);
 
         MainConsole.Clear();
-        CenterScreen("Hours pass...", time:2000);
+        CenterScreen("Hours pass...", time: 2000);
         MainConsole.Clear();
     }
     static void Chapter1()
     {
-        Print("§(8)You awake.", sleep: 84);
+        Narrate("You awake.");
         Say(name, "Uhh... what happened?", msgColor: ConsoleColor.Yellow);
         Say(name, "Wait, what? Am I on a deserted island?", msgColor: ConsoleColor.Yellow);
         Say(name, "Oh that Dave! What a prankster!", msgColor: ConsoleColor.Yellow);
         Say(name, "What in the world should I do now?", 2, msgColor: ConsoleColor.Yellow);
 
+        int choice = Choose(new string[] { "Forage for food", "Dig for gold", "Shout for help", "Sleep" });
     }
 
-    static void Main(string[] args)
+    static void Instructions()
+    {
+        MainConsole.Clear();
+        DigArt(0, 0);
+        string[] messages = new string[] { "Survive being cast away on a desert island!",
+                                           "",
+                                           "Press any key to return to the main menu." };
+        Dictionary<int, int> colorScheme = new Dictionary<int, int>() { { 2, 8 } };
+        // this means the line at index 2 (press any key...) will be colour 8 == ConsoleColor.DarkGray
+        CenterText(messages, colors:colorScheme);
+    }
+
+    static void MainMenu()
+    {
+        bool usingMainMenu = true;
+        while (usingMainMenu)
+        {
+            DigArt(0);
+            int choice = Choose(new string[] { "Continue Game", "Instructions", "New Game", "Exit" });
+            switch (choice)
+            {
+                case 0: usingMainMenu = false; break;
+                case 1: Instructions(); break;
+                case 2: throw new NewGameException();
+                case 3: Environment.Exit(0); break;
+            }
+        }
+    }
+
+    static void NewGame()
     {
         Prologue();
+
         while (Console.KeyAvailable) { Console.ReadKey(false); } // clear consolekey buffer
 
         Chapter1();
+    }
+
+    public class NewGameException : Exception { }
+
+    static void Main(string[] args)
+    {
+        bool usingStartMenu = true;
+        while (usingStartMenu)
+        {
+            DigArt(0);
+            int choice = Choose(new string[] { "New Game", "Instructions", "Exit" });
+            switch (choice)
+            {
+                case 0: usingStartMenu = false; break;
+                case 1: Instructions(); break;
+                case 3: Environment.Exit(0); break;
+            }
+        }
+
+        while (true)
+        {
+            try
+            {
+                NewGame();
+            }
+            catch (NewGameException)
+            {
+                name = "You";
+            }
+        }
     }
 }
