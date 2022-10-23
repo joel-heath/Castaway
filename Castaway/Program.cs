@@ -212,54 +212,6 @@ class Program
     {
         Print(contents, newLines, x, y, highlight, sleep, msgColor);
     }
-    static void CenterScreen(string title, string subtitle = "", int? time = null, string audioLocation = "", string sound = "")
-    {
-        Console.ForegroundColor = ConsoleColor.White;
-        Console.BackgroundColor = ConsoleColor.Black;
-        Console.Clear();
-
-        // Margin-top
-        for (int i = 0; i < 10; i++)
-        {
-            Console.WriteLine("");
-        }
-
-        // Title & subtitle
-        Console.SetCursorPosition((Console.WindowWidth - title.Length) / 2, Console.CursorTop);
-        Console.WriteLine(title);
-        Console.SetCursorPosition((Console.WindowWidth - subtitle.Length) / 2, (Console.CursorTop + 1));
-        Console.WriteLine(subtitle);
-
-        // Spacing to cursor
-        for (int i = 0; i < 10; i++)
-        {
-            Console.WriteLine("");
-        }
-        Console.SetCursorPosition((Console.WindowWidth) / 2, (Console.CursorTop + 2));
-
-        // Music & wait for keypress
-        if (audioLocation != "")
-        {
-            AudioPlaybackEngine.Instance.PlayLoopingMusic(audioLocation);
-        }
-        else if (sound != "")
-        {
-            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(sound));
-        }
-
-        if (time.HasValue) { Thread.Sleep(time.Value); }
-        else
-        {
-            while (true)
-            {
-                if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Enter)
-                {
-                    AudioPlaybackEngine.Instance.StopLoopingMusic();
-                    break;
-                }
-            }
-        }
-    }
     //public class EscapeException : Exception { }
     public class EnterException : Exception { }
     static (int, int) HandleKeyPress(ConsoleLogs inputString, ConsoleKeyInfo keyPressed, int margin, int xPos, int yPos)
@@ -452,7 +404,7 @@ class Program
         MainConsole.Clear();
         return choice;
     }
-    static void CenterText(ConsoleMessage[] input, int? time = null, int marginTop = 10, string audioLocation = "", bool anyKey = false)
+    static void CenterText(ConsoleMessage[] input, int? time = null, int marginTop = 10, string audioLocation = "")
     {
         for (int i = 0; i < input.Length; i++)
         {
@@ -673,6 +625,8 @@ class Program
         switch (route)
         {
             case 0: Route0(); break;
+            case 1: Route1(); break;
+            case 2: Route2(); break;
         }
     }
 
@@ -699,33 +653,51 @@ class Program
         greg.Say("What a ridiculous name.");
         dave.Say($"Hey, {Player.Name}'s my best friend!");
         AudioPlaybackEngine.Instance.StopLoopingMusic();
+        AudioPlaybackEngine.Instance.PlayLoopingMusic("Crickets.wav");
+        AudioPlaybackEngine.Instance.PlaySound(new CachedSound("AwkwardCough.wav"));
+        greg.Voice = new CachedSound("GregSpeak.wav");
+        dave.Voice = new CachedSound("DaveSpeak.wav");
+        Thread.Sleep(1000);
         greg.Say("...", sleep: 200);
         dave.Say("...", sleep: 200);
+        greg.Voice = null;
+        dave.Voice = null;
+        Thread.Sleep(1000);
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+        AudioPlaybackEngine.Instance.PlayLoopingMusic("OhNo.mp3");
         dave.Say($"LOL! Just kidding! Bye, {Player.Name}!");
-        Narrate("Dave pushes you off the ship.");
+        Narrate("Dave pushes you off the cruise, into the unforgiving waters.");
         Narrate("You fall.");
         Narrate("You survive.");
         Narrate("With a minor major interior exterior concussion.");
         Thread.Sleep(1500);
-
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
         MainConsole.Clear();
-        CenterScreen("Days pass...", time: 2000, sound: "DaysPass.wav");
+        CenterText(new ConsoleMessage[] { "Days pass..." }, time: 2000, audioLocation: "DaysPass.wav");
         MainConsole.Clear();
     }
     static int Chapter1()
     {
+        AudioPlaybackEngine.Instance.PlayLoopingMusic("BeachSounds.wav");
+        Thread.Sleep(1000);
         Narrate("You awake.");
         Player.Say("Uhh... what happened?");
         Player.Say("Wait, what? Am I on a deserted island?");
         Player.Say("Oh that §(10)Dave§(11)! What a prankster!");
 
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
         AudioPlaybackEngine.Instance.PlayLoopingMusic("Moonlight beach.mp3");
 
         ConsoleMessage[] choices = new ConsoleMessage[] { "Forage for food", "Dig for gold", "Shout for help", "Sleep", "View stats" };
 
         int route = -1;
+        int loops = 0;
         while (route == -1)
         {
+            if (loops == 5)
+            {
+                return rand.Next(1,3); // go down pirate or monkey route
+            }
             Player.Say("What in the world should I do now?", 2);
 
             while (Console.KeyAvailable) { Console.ReadKey(false); } // clear consolekey buffer
@@ -748,6 +720,7 @@ class Program
                     break;
                 case 4: ViewStats(); ViewInventory(); break;
             }
+            loops++;
         }
 
         return route;
@@ -756,7 +729,9 @@ class Program
     {
         MainConsole.Clear();
         int luck = rand.Next(0, 101);
+        AudioPlaybackEngine.Instance.PauseLoopingMusic();
         AudioPlaybackEngine.Instance.PlaySound(new CachedSound("Discovery.wav"), true);
+        AudioPlaybackEngine.Instance.ResumeLoopingMusic();
 
         if (luck < 20)
         {
@@ -821,7 +796,7 @@ class Program
                 dave.Say("And I'll leave as soon as I came.");
                 Player.Say("Wait! Please help me out! I'm in dire need of your assistance!");
                 dave.Say("Ugh okay, here's a §(9)diamond.");
-                Narrate("§(13)Maybe the someone will be interested in this...");
+                Narrate("§(13)Maybe someone will be interested in this...");
                 Narrate($"Your§(12) charisma §(7)is restored to 100.");
                 AddCharisma(100);
                 Player.Say("See you later Dave!");
@@ -898,17 +873,19 @@ class Program
 
         // [0] sand | [1] empty | [2] gold coin | [3] diamond | [4] stick 
         int[,] map = new int[5, 5];
-
+        bool diamond = false;
         int xChoice = 0, yChoice = 0;
         for (int choices = 0; choices < 5; choices++)
         {
             Print($"You have {5 - choices} choice{(choices == 4 ? "" : "s")} remaining. ", 2, 0, 0);
+            DrawDigGame(map, xChoice, yChoice);
 
+            diamond = false;
             bool chosen = false;
             while (!chosen)
             {
                 //MainConsole.Clear(1, 7);
-                DrawDigGame(map, xChoice, yChoice);
+                //DrawDigGame(map, xChoice, yChoice);
 
                 switch (Console.ReadKey(true).Key)
                 {
@@ -916,39 +893,47 @@ class Program
                         if (xChoice < 4)
                         {
                             xChoice++;
+                            DrawDigGame(map, xChoice, yChoice);
+                            /*
                             Console.Clear();
-                            MainConsole.Refresh();
+                            MainConsole.Refresh();*/
                         }
                         break;
                     case ConsoleKey.LeftArrow:
                         if (xChoice > 0)
                         {
                             xChoice--;
+                            DrawDigGame(map, xChoice, yChoice);
+                            /*
                             Console.Clear();
-                            MainConsole.Refresh();
+                            MainConsole.Refresh();*/
                         }
                         break;
                     case ConsoleKey.DownArrow:
                         if (yChoice < 4)
                         {
                             yChoice++;
+                            DrawDigGame(map, xChoice, yChoice);
+                            /*
                             Console.Clear();
-                            MainConsole.Refresh();
+                            MainConsole.Refresh();*/
                         }
                         break;
                     case ConsoleKey.UpArrow:
                         if (yChoice > 0)
                         {
                             yChoice--;
+                            DrawDigGame(map, xChoice, yChoice);
+                            /*
                             Console.Clear();
-                            MainConsole.Refresh();
+                            MainConsole.Refresh();*/
                         }
                         break;
                     case ConsoleKey.Spacebar:
                     case ConsoleKey.Enter:
                         if (map[yChoice, xChoice] == 0)
                         {
-
+                            DrawDigGame(map, xChoice, yChoice);
                             AudioPlaybackEngine.Instance.PlaySound(sandDestroy);
                             chosen = true; 
                         }
@@ -990,18 +975,20 @@ class Program
                 item = "§(9)diamond";
                 map[yChoice, xChoice] = 3;
                 AddToInventory("Diamonds", 1);
+                diamond = true;
                 charisma = 50;
 
             }
 
             Print($"You found {count} {item}§(15)!", 1, 0, 8 + choices*2);
-            if (item == "diamond") { Narrate("§(13)Maybe the someone will be interested in this..."); }
+            if (diamond) { Narrate("§(13)Maybe someone will be interested in this..."); }
             Print($"§(7)Your §(12)charisma §(7)goes {(charisma < 0 ? "down" : "up")} by {Math.Abs(charisma)}.");
             AddCharisma(charisma);
         }
 
         Print($"You have 0 choices remaining.", 2, 0, 0);
         DrawDigGame(map, -1, -1);
+        if (diamond) { Narrate("§(13)Maybe someone will be interested in this..."); }
         Narrate("Press any key to continue.", 0, 0, 18);
         while (Console.KeyAvailable) { Console.ReadKey(false); } // clear consolekey buffer
         Console.ReadKey();
@@ -1018,8 +1005,53 @@ class Program
 
         chanelle.Say($"Welcome to our village, {Player.Name}!");
     }
+
+    static void MonkeyRace()
+    {
+        var countdown = new CachedSound("RaceCountdown.wav");
+        AudioPlaybackEngine.Instance.PlaySound(countdown, true);
+        Print("§(4)3 ", 0); Thread.Sleep(1000);
+        Print("§(4)2 ", 0); Thread.Sleep(1000);
+        Print("§(§)1 ", 0); Thread.Sleep(1000);
+        Print("§(10)GO! ", 0); Thread.Sleep(1000);
+
+
+    }
     static void Route1() // Monkey route
-    { }
+    {
+        AudioPlaybackEngine.Instance.PlayLoopingMusic("Juanty Gumption.mp3");
+        Narrate("A group of monkeys approaches!");
+        Narrate("They challenge you to a race across the island.");
+        Narrate("Do you accept?");
+        if (Choose(new ConsoleMessage[] { "Yes", "No" }) == 1)
+        {
+            MainConsole.Clear();
+            Narrate("The monkeys inch closer towards you.");
+            Narrate("You feel an unsettling atmosphere surround you.");
+            Narrate("Do you accept?");
+            if (Choose(new ConsoleMessage[] { "Yes", "No" }) == 1)
+            {
+                MainConsole.Clear();
+                Narrate("The monkeys inch closer still.");
+                Narrate("Do you accept?");
+                if (Choose(new ConsoleMessage[] { "Yes", "No" }) == 1)
+                {
+                    MainConsole.Clear();
+                    Narrate("The monkeys give you one last chance to accept.");
+                    Narrate("Do you accept?");
+                    if (Choose(new ConsoleMessage[] { "Yes", "No" }) == 1)
+                    {
+                        MainConsole.Clear();
+                        // epic monkey boss battle.
+                    }
+                }
+            }
+        }
+
+        MonkeyRace();
+
+
+    }
     static void Route2() // Pirate route
     { }
 

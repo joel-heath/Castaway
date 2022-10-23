@@ -58,7 +58,7 @@ class AudioPlaybackEngine : IDisposable
         outputDevice.Dispose();
     }
 
-    internal void StopLoopingMusic()
+    public void StopLoopingMusic()
     {
         if (loopingMixerInput != null)
         {
@@ -69,7 +69,23 @@ class AudioPlaybackEngine : IDisposable
         }
     }
 
-    internal void PlayLoopingMusic(string audioLocation)
+    public void PauseLoopingMusic()
+    {
+        if (loopingMixerInput != null)
+        {
+            mixer.RemoveMixerInput(loopingMixerInput);
+        }
+    }
+
+    public void ResumeLoopingMusic()
+    {
+        if (loopingMixerInput != null)
+        {
+            mixer.AddMixerInput(loopingMixerInput);
+        }
+    }
+
+    public void PlayLoopingMusic(string audioLocation)
     {
         StopLoopingMusic();
         
