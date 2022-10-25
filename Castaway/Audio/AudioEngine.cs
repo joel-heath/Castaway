@@ -94,5 +94,11 @@ class AudioPlaybackEngine : IDisposable
         this.loopingMixerInput = AddMixerInput(loopingMusic.ToSampleProvider());
     }
 
+    public void StopAllSounds()
+    {
+        StopLoopingMusic();
+        mixer.RemoveAllMixerInputs();
+    }
+
     public static readonly AudioPlaybackEngine Instance = new AudioPlaybackEngine(44100, 2);
 }
