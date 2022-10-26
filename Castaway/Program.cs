@@ -58,16 +58,15 @@ class Program
 
         // Turns: new ConsoleMessage[] { new ConsoleMessage("Hello"), new ConsoleMessage("Hi") };
         // Into:  Build("Hello", "Hi");
-
-        /* old way bad
-        public static ConsoleMessage[] Build(params string[] messages)
-        {
-            return messages.Select(m => new ConsoleMessage(m)).ToArray();
-        }
-        */
         public static ConsoleMessage[] Build(params ConsoleMessage[] messages)
         {
             return messages;
+        }
+        public static ConsoleMessage[] ConvertStringArray(string[] array)
+        {
+            ConsoleMessage[] newArray = new ConsoleMessage[array.Length];
+            for (int i=0; i < array.Length; i++) { newArray[i] = array[i]; }
+            return newArray;
         }
 
         // The following is used for building a shop menu. Probably way to overcomplicated but oh well
@@ -299,7 +298,7 @@ class Program
     {
         while (Console.KeyAvailable) { Console.ReadKey(true); } // clear consolekey buffer
     }
-    static string ReadChars()
+    static string ReadChars(int maxChars = -1)
     {
         string output = string.Empty;
         bool complete = false;
@@ -308,12 +307,25 @@ class Program
 
         ConsoleLogs input = new ConsoleLogs();
 
-        while (!complete)
+        if (maxChars < -1)
         {
-            Console.SetCursorPosition(x, y);
-            ConsoleKeyInfo keyPressed = Console.ReadKey(true);
-            try { (x, y) = HandleKeyPress(input, keyPressed, startPoint, x, y); }
-            catch (EnterException) { complete = true; }
+            while (!complete)
+            {
+                Console.SetCursorPosition(x, y);
+                ConsoleKeyInfo keyPressed = Console.ReadKey(true);
+                try { (x, y) = HandleKeyPress(input, keyPressed, startPoint, x, y); }
+                catch (EnterException) { complete = true; }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < maxChars; i++)
+            {
+                Console.SetCursorPosition(x, y);
+                ConsoleKeyInfo keyPressed = Console.ReadKey(true);
+                try { (x, y) = HandleKeyPress(input, keyPressed, startPoint, x, y); }
+                catch (EnterException) { break; }
+            }
         }
 
         foreach (ConsoleMessage message in input.History)
@@ -322,22 +334,6 @@ class Program
         }
 
         return output;
-    }
-    static int ReadInt(int xCoord = -1, int yCoord = -1)
-    {
-        while (true)
-        {
-            Print("§(14)> ", newLines: 0, x: xCoord, y: yCoord);
-            string uInput = ReadChars();
-            if (int.TryParse(uInput, out int result))
-            {
-                return result;
-            }
-            else
-            {
-                MainConsole.Refresh();
-            }
-        }
     }
     static string ReadStr(int xCoord = -1, int yCoord = -1, int maxLength = -1, bool pointer = false)
     {
@@ -363,7 +359,7 @@ class Program
             }
         }
     }
-    static int Choose(ConsoleMessage[] options, bool escapable = true, CachedSound? mainSelectSound = null)
+    static int Choose(ConsoleMessage[] options, bool escapable = true, CachedSound? mainSelectSound = null, bool drawHealth = false)
     {
         ClearKeyBuffer();
         mainSelectSound ??= menuSelect;
@@ -405,6 +401,7 @@ class Program
 
                 xIndent += options[i].Length() + 10;
             }
+            if (drawHealth) { DrawHealth(); } // for pirate battle minigame, needs to redraw on console clear
 
             switch (Console.ReadKey(true).Key)
             {
@@ -442,10 +439,10 @@ class Program
             Console.CursorVisible = true;
         }
         MainConsole.Refresh();
-        //MainConsole.Clear();
+        if (drawHealth) { DrawHealth(); }
         return choice;
     }
-    static int SimpleChoose(ConsoleMessage[] options, bool escapable = true, CachedSound? mainSelectSound = null)
+    static int SimpleChoose(ConsoleMessage[] options, bool escapable = true, CachedSound? mainSelectSound = null, bool drawHealth = false)
     {
         mainSelectSound ??= menuSelect;
         int choice = 0;
@@ -477,7 +474,7 @@ class Program
 
             Console.ForegroundColor = ConsoleColor.White;
             Console.BackgroundColor = ConsoleColor.Black;
-
+            if (drawHealth) { DrawHealth(); }
             ClearKeyBuffer();
             switch (Console.ReadKey(true).Key)
             {
@@ -516,6 +513,7 @@ class Program
         }
 
         MainConsole.Refresh();
+        if (drawHealth) { DrawHealth(); }
         return choice;
     }
     static void CenterText(ConsoleMessage[] input, int? time = null, int marginTop = 10, string audioLocation = "")
@@ -565,7 +563,7 @@ class Program
         {
             using (StringReader reader = new StringReader(art))
             {
-                CachedSound sound = new CachedSound("DigSand.wav");
+                CachedSound sound = new CachedSound(@"Sounds\DigSand.wav");
                 string? line;
                 while ((line = reader.ReadLine()) != null)
                 {
@@ -623,11 +621,20 @@ class Program
     static List<string> knowledge = new List<string>(); // Used for storing whether player has entered a house and stuff
     static Dictionary<string, int> inventory = new Dictionary<string, int>();
     static Random rand = new Random();
-    static CachedSound menuBleep = new CachedSound("MenuBleepSoft.wav");
-    static CachedSound menuSelect = new CachedSound("MenuSelected.wav");
-    static CachedSound pauseSound = new CachedSound("PauseButton.wav");
+    static DateTime gameStarted;
+    static CachedSound menuBleep = new CachedSound(@"Sounds\MenuBleep.wav");
+    static CachedSound menuSelect = new CachedSound(@"Sounds\MenuSelect.wav");
+    static CachedSound pauseSound = new CachedSound(@"Sounds\PauseButton.wav");
     public class CharismaZeroException : Exception { }
-    public class WonGameException : Exception { }
+    public class WonGameException : Exception
+    {
+        public int Route { get; }
+        public WonGameException(int route)
+        {
+            this.Route = route;
+        }
+
+    }
 
     static Person Player = new Person("You", ConsoleColor.Cyan, null); // "YouSpeak.wav"
     static int Buy(int cost)
@@ -648,7 +655,7 @@ class Program
     }
     static void AddCharisma(int charisma, bool narrate = true)
     {
-        if (narrate) { Narrate($"§(7)Your §(12)charisma §(7) {(charisma < 0 ? "drops" : "goes up")} by {Math.Abs(charisma)}."); }
+        if (narrate) { Narrate($"§(7)Your §(12)charisma §(7){(charisma < 0 ? "drops" : "goes up")} by {Math.Abs(charisma)}."); }
         int newCharisma = stats[1] + charisma;
         if (newCharisma > 100)
         {
@@ -677,7 +684,7 @@ class Program
     {
         MainConsole.Clear();
         DigArt(0, 0);
-        var messages = new ConsoleMessage[] { "Survive being cast away on a seemily remote desert island!",
+        var messages = new ConsoleMessage[] { "Survive being cast away on a seeminly remote desert island!",
                                               "",
                                               "§(12)Charisma §(15)is your will to continue.",
                                               "Don't let it fall to 0, and make sure to monitor it often!",
@@ -706,17 +713,12 @@ class Program
     static void ViewStats()
     {
         MainConsole.Clear();
+        string timeSoFar = $"{(DateTime.Now - gameStarted):hh\\:mm\\:ss}";
         Print("Statistics", 2);
-        for (int i = 1; i < stats.Length; i++) // i=1, skipping fun value (they cant know that mwahahaha)
-        {
-            string stat = string.Empty;
-            switch (i)
-            {
-                case 1: stat = "§(12)Charisma"; break;
-                case 2: stat = "Puppies saved"; break;
-            }
-            Print($"{stat}§(15): {stats[i]}");
-        }
+
+        Print($"§(12)Charisma§(15): {stats[1]}");
+        Print($"Time taken: {timeSoFar}");
+
         Print("", 1);
         Print("§(8)Press any key to continue.");
         Console.ReadKey();
@@ -742,18 +744,19 @@ class Program
     }
     static void NewGame()
     {
+        MainConsole.Clear();
         stats[0] = rand.Next(0, 101); // random 'fun' value (stole that idea from undertale)
         stats[1] = 90; // Charisma level
         Player.Name = "You";
         inventory = new Dictionary<string, int> { { "Gold", 25 } };
 
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Screen Saver.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\00 Title Screen.mp3");
 
         bool usingStartMenu = true;
         while (usingStartMenu)
         {
             DigArt(0, 100);
-            int choice = Choose(Build("New Game", "Instructions", "Exit"), false, new CachedSound("GameStart.wav"));
+            int choice = Choose(Build("New Game", "Instructions", "Exit"), false, new CachedSound(@"Sounds\GameStart.wav"));
             switch (choice)
             {
                 case 0: usingStartMenu = false; break;
@@ -764,53 +767,38 @@ class Program
 
         AudioPlaybackEngine.Instance.StopLoopingMusic();
         MainConsole.Clear();
+        gameStarted = DateTime.Now;
 
+        
+        Prologue();
 
-
-        Route1();
-
-        /*
-        AddToInventory("Gold", 50);
-        AddToInventory("Diamonds", 2);
-        AddToInventory("Sticks", 12);
-
-        Shop();
-        Route0();
-        */
-
-
-
-        /// actual main game
-
-        /*Prologue();
-
-ClearKeyBuffer();
+        ClearKeyBuffer();
         MainConsole.Clear();
 
         int route = Chapter1();
-        
+
         ClearKeyBuffer();
         MainConsole.Clear();
 
         switch (route)
         {
-            case 0: Route0(); break;
-            case 1: Route1(); break;
-            case 2: Route2(); break;
-        }*/
+            case 0: Route1(); break;
+            case 1: Route2(); break;
+            case 2: Route3(); break;
+        }
     }
 
 
     /// CHAPTER 1
     static void Prologue()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Night in venice.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Night in venice.mp3");
         Person dave = new Person("Dave", ConsoleColor.DarkCyan, null); // "DaveSpeak.wav"
         Person greg = new Person("Greg", ConsoleColor.Green, null); // "GregSpeak.wav"
 
         MainConsole.Clear();
         Narrate("17:23. Ocean Atlantic Cruise", 2);
-        dave.Say("Ha, good one §(10)Greg§(3)!");
+        dave.Say("Ha, good one Greg!");
         greg.Say("I know right, I'm a real comedian!");
         Player.Say("Um, actually that wasn't that funny...");
         greg.Say("What? Who's this kid?");
@@ -822,12 +810,12 @@ ClearKeyBuffer();
         MainConsole.Refresh();
 
         greg.Say("What a ridiculous name.");
-        dave.Say($"Hey, §(11){Player.Name}§(3)'s my best friend!");
+        dave.Say($"Hey, {Player.Name}'s my best friend!");
         AudioPlaybackEngine.Instance.StopLoopingMusic();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Crickets.wav");
-        AudioPlaybackEngine.Instance.PlaySound(new CachedSound("AwkwardCough.wav"));
-        greg.Voice = new CachedSound("GregSpeak.wav");
-        dave.Voice = new CachedSound("YouSpeak.wav");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Crickets.wav");
+        AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\AwkwardCough.wav"));
+        greg.Voice = new CachedSound(@"Sounds\VoiceGreg.wav");
+        dave.Voice = new CachedSound(@"Sounds\VoiceYou.wav");
         Thread.Sleep(1000);
         greg.Say("...", sleep: 200);
         dave.Say("...", sleep: 200);
@@ -835,21 +823,21 @@ ClearKeyBuffer();
         dave.Voice = null;
         Thread.Sleep(1000);
         AudioPlaybackEngine.Instance.StopLoopingMusic();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("OhNo.mp3");
-        dave.Say($"LOL! Just kidding! Bye, §(11){Player.Name}§(3)!");
-        Narrate("§(3)Dave §(7)pushes you off the cruise, into the unforgiving waters.");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\OhNo.mp3");
+        dave.Say($"LOL! Just kidding! Bye, {Player.Name}!");
+        Narrate("Dave pushes you off the cruise, into the unforgiving waters.");
         Narrate("You fall.");
         Narrate("You survive.");
         Narrate("With a minor major interior exterior concussion.");
         Thread.Sleep(1500);
         AudioPlaybackEngine.Instance.StopLoopingMusic();
         MainConsole.Clear();
-        CenterText(Build("Days pass..."), time: 2000, audioLocation: "DaysPass.wav");
+        CenterText(Build("Days pass..."), time: 2000, audioLocation: @"Sounds\DaysPass.wav");
         MainConsole.Clear();
     }
     static int Chapter1()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("BeachSounds.wav");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Beach Sounds.wav");
         Thread.Sleep(1000);
         Narrate("You awake.");
         Player.Say("Uhh... what happened?");
@@ -861,7 +849,7 @@ ClearKeyBuffer();
         int route = -1;
         int loops = 0;
 
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Moonlight beach.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Moonlight beach.mp3");
         while (route == -1)
         {
             if (loops == 5)
@@ -899,7 +887,7 @@ ClearKeyBuffer();
         MainConsole.Clear();
         int luck = rand.Next(0, 101);
         AudioPlaybackEngine.Instance.PauseLoopingMusic();
-        AudioPlaybackEngine.Instance.PlaySound(new CachedSound("Discovery.wav"), true);
+        AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\Discovery.wav"), true);
         AudioPlaybackEngine.Instance.ResumeLoopingMusic();
 
         if (luck < 20)
@@ -974,7 +962,7 @@ ClearKeyBuffer();
                 Player.Say("Please help me get off this island, §(10)Greg§(11)!");
                 greg.Say("Ugh, fine. Get on the boat");
                 Narrate("§(10)Greg §(7)takes you back home.");
-                throw new WonGameException();
+                throw new WonGameException(0);
             }
         }
         else
@@ -1030,7 +1018,7 @@ ClearKeyBuffer();
     }
     static void DigGame()
     {
-        CachedSound sandDestroy = new CachedSound("DigSand.wav");
+        CachedSound sandDestroy = new CachedSound(@"Sounds\DigSand.wav");
 
         MainConsole.Clear();
 
@@ -1153,9 +1141,9 @@ ClearKeyBuffer();
     /// CHAPTER 2
 
     /// Diamond route
-    static void Route0()
+    static void Route1()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Fuzzball Parade.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
 
         Person chanelle = new Person("Chanelle", ConsoleColor.DarkMagenta, null);
         Person addison = new Person("Addison", ConsoleColor.DarkBlue, null);
@@ -1167,41 +1155,61 @@ ClearKeyBuffer();
         shaniece.Say("Take a look at my hotel for a place to sleep at night.");
         mackenzie.Say("Check out my shop to spend that §(9)diamond §(4)of yours.");
 
+        ConsoleMessage[] options = Build("Mackenzie's Shop", "Shaniece's Hotel", "View stats", "Search Further East");
         bool skipRamble = false; // cleans the transition to the east side
         bool finished = false;
         while (!finished)
         {
             if (!skipRamble) { Player.Say("What do I do now?"); }
             skipRamble = false;
-            switch (Choose(Build("Mackenzie's Shop", "Shaniece's Hotel", "View stats", "Search Further East")))
+            switch (Choose(options))
             {
                 case -1: MainMenu(); break;
                 case 0: Shop(); break;
                 case 1: Hotel(); break;
                 case 2: ViewStats(); ViewInventory(); break;
-                case 3: EastSide(); skipRamble = true; break;
+                case 3: if (options[3] == (ConsoleMessage)"Search Further East")
+                    {
+                        if (EastSide())
+                        {
+                            options[3] = "§(13)Set sail";
+                        };
+                        skipRamble = true;
+                    }
+                    else
+                    {
+                        finished = true;
+                    }
+                    break;
             }
 
             if (!skipRamble) { MainConsole.Clear(); }
         }
+
+        Narrate("You wander towards the boat to find a shambolic raft");
+        Player.Say("Well I've not really got a choice, have I?");
+        Narrate("You board the boat and set sail.");
+        Thread.Sleep(1000);
+
+        SailBoat();
     }
-    static void EastSide()
+    static bool EastSide()
     {
-        bool finished = false;
+        bool CanLeaveIsland = false;
         ConsoleMessage[] choices = { knowledge.Contains("Entered Greg's") ? "Greg's House" : "Small House",
                                      knowledge.Contains("Spoken with scammer") ? "Chanelle's House" : "Large House",
                                      "Sketchy Alleyway", "Return" };
-        while (!finished)
+        while (true)
         {
             int choice = Choose(choices);
             MainConsole.Refresh();
             switch (choice)
             {
                 case 0: GregHouse(); choices[0] = "Greg's House"; break;
-                case 1: ScammerHouse(); choices[1] = "Chanelle's House"; break;
+                case 1: CanLeaveIsland = ScammerHouse(); choices[1] = "Chanelle's House"; break;
                 case 2: // sketchy allyway
                     AudioPlaybackEngine.Instance.StopLoopingMusic();
-                    AudioPlaybackEngine.Instance.PlayLoopingMusic("Crickets.wav"); // quiet wind instead pls
+                    AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Cold Wind.mp3");
                     MainConsole.Clear();
                     Narrate("There doesn't seem to be much around here.");
                     Narrate("...", sleep: 150);
@@ -1218,21 +1226,18 @@ ClearKeyBuffer();
                     Thread.Sleep(1000);
                     break;
 
-
-                case 3: return;
+                case 3: return CanLeaveIsland;
             }
 
             AudioPlaybackEngine.Instance.StopLoopingMusic();
-            AudioPlaybackEngine.Instance.PlayLoopingMusic("Fuzzball Parade.mp3");
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
         }
-
-
     }
     static void GregHouse()
     {
         MainConsole.Clear();
         AudioPlaybackEngine.Instance.StopLoopingMusic();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Onion Capers.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Onion Capers.mp3");
         Person greg = new Person("Greg", ConsoleColor.Green, null);
 
         if (knowledge.Contains("Entered Greg's"))
@@ -1267,16 +1272,28 @@ ClearKeyBuffer();
             Thread.Sleep(1000);
         }
     }
-    static void ScammerHouse()
+    static bool ScammerHouse()
     {
         MainConsole.Clear();
         AudioPlaybackEngine.Instance.StopLoopingMusic();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Music to Delight.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Music to Delight.mp3");
 
         Person chanelle = new Person("Chanelle", ConsoleColor.DarkMagenta, null);
 
         if (knowledge.Contains("Scammed"))
         {
+            if (ItemCount("Old map") > 0 && ItemCount("Rope") > 0)
+            {
+                chanelle.Say("Who is it?");
+                Player.Say($"It's {Player.Name} again.");
+                chanelle.Say("Ugh how badly do you want this boat?");
+                Player.Say("I already payed for it!");
+                chanelle.Say("Fine, fine, don't get your knickers in a twist.");
+                chanelle.Say("I've docked it at the island bay. Take it! I don't want it.");
+                Narrate("Chanelle shuts the door on you");
+                return true;
+            }
+
             chanelle.Say("Sorry! I'm busy right now!");
         }
         else
@@ -1322,11 +1339,12 @@ ClearKeyBuffer();
 
             Thread.Sleep(1000);
         }
+        return false;
     }
     static void Shop()
     {
         MainConsole.Clear();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Local Forecast.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Local Forecast.mp3");
 
         Person mackenzie = new Person("Mackenzie", ConsoleColor.DarkRed, null);
 
@@ -1384,7 +1402,7 @@ ClearKeyBuffer();
             Console.ReadKey();
         }
 
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Fuzzball Parade.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
     }
     static Tuple<int, int> ShopMenu(params Tuple<ConsoleMessage, int>[][] shelves)
     {
@@ -1505,7 +1523,7 @@ ClearKeyBuffer();
     static void Hotel()
     {
         MainConsole.Clear();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Porch Swing Days Loop.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Porch Swing Days Loop.mp3");
 
         Person shaniece = new Person("Shaniece", ConsoleColor.DarkGreen, null);
 
@@ -1539,7 +1557,11 @@ ClearKeyBuffer();
 
         Thread.Sleep(1000);
         MainConsole.Clear();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Fuzzball Parade.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
+    }
+    static void SailBoat()
+    {
+
     }
 
 
@@ -1611,9 +1633,9 @@ ClearKeyBuffer();
         int playerPos = 16;
         int monkeyPos1 = 12;
         int monkeyPos2 = 12;
-        Print("After the countdown you will have 10 seconds to sprint to the finish line.");
-        Print("Press [SPACE] as fast as you can to run faster.");
-        Print("Walk to the start line to begin the race.");
+        Print("§(8)After the countdown you will have 10 seconds to sprint to the finish line.", Console.WindowHeight - 4);
+        Print("§(8)Press [SPACE] as fast as you can to run faster.");
+        Print("§(8)Walk to the start line to begin the race.");
 
         while (playerPos > 12)
         {
@@ -1632,7 +1654,7 @@ ClearKeyBuffer();
         }
 
         DrawMonkeyRace(map);
-        CachedSound countdown = new CachedSound("RaceCountdown.wav");
+        CachedSound countdown = new CachedSound(@"Sounds\RaceCountdown.wav");
         AudioPlaybackEngine.Instance.StopLoopingMusic();
         AudioPlaybackEngine.Instance.PlaySound(countdown);
         Print("§(4)3 ", 0); Thread.Sleep(1000);
@@ -1640,7 +1662,8 @@ ClearKeyBuffer();
         Print("§(4)1 ", 0); Thread.Sleep(1000);
         Print("§(10)GO! ", 2);
         ClearKeyBuffer();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Adventures Of Captian Trillian Loop.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captian Trillian.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captian Trillian.mp3");
         while (playerPos > 0)
         {
             MainConsole.Refresh(); // deletes everything, then rewrites only the logged messages.
@@ -1676,7 +1699,7 @@ ClearKeyBuffer();
     {
         // creativity is hard sometimes, this whole battle idea is stolen from Monkey Island (hence the monkeys)
 
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Five Armies.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Five Armies.mp3");
         Person king = new Person("King Monkey", ConsoleColor.DarkRed, null);
 
         king.Say("So, you--a meer human--think you can defeat me?");
@@ -1730,7 +1753,7 @@ ClearKeyBuffer();
     }
     static void Volcano()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Clash Defiant.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Clash Defiant.mp3");
 
         Person craig = new Person("Craig The Monkey", ConsoleColor.DarkGreen, null);
         Person walt = new Person("Walt The Monkey", ConsoleColor.DarkBlue, null);
@@ -1741,7 +1764,7 @@ ClearKeyBuffer();
         craig.Say("Eee-ee Aa-aa! (You will live if you are king!)");
         Player.Say("HELP ME!");
 
-        AudioPlaybackEngine.Instance.PlaySound(new CachedSound("CartoonFall.wav"));
+        AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\CartoonFall.wav"));
         // fallign down sound
         Thread.Sleep(3000);
         ClearKeyBuffer();
@@ -1752,21 +1775,21 @@ ClearKeyBuffer();
         {
             ClearKeyBuffer();
             MainConsole.Clear();
-            AudioPlaybackEngine.Instance.PlaySound(new CachedSound("Crash.mp3"), true);
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\Crash.mp3"), true);
             AudioPlaybackEngine.Instance.ResumeLoopingMusic();
             CenterText(new ConsoleMessage[] { "You died..." });
             throw new NewGameException();
         }
         AudioPlaybackEngine.Instance.StopAllSounds();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Boogie Party.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Boogie Party.mp3");
         ClearKeyBuffer();
         Narrate("In the nick of time you grabbed a ledge while you fell!");
         Narrate("The monkeys promote you to their new king.");
-        throw new WonGameException();
+        throw new WonGameException(2);
     }
-    static void Route1()
+    static void Route2()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Jaunty Gumption.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Jaunty Gumption.mp3");
 
         Person craig = new Person("Craig The Monkey", ConsoleColor.DarkGreen, null);
         Person walt = new Person("Walt The Monkey", ConsoleColor.DarkBlue, null);
@@ -1807,7 +1830,7 @@ ClearKeyBuffer();
         {
             MonkeyRace();
             MainConsole.Clear();
-            AudioPlaybackEngine.Instance.PlayLoopingMusic("Winner Winner.mp3");
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Winner Winner.mp3");
 
             craig.Say("Ooo-oo Aa-aa! (The human beat us!)");
             walt.Say("Aaa-aa Eee-ee! (The human must be our new king!)");
@@ -1823,28 +1846,32 @@ ClearKeyBuffer();
 
 
     /// Pirate Route
-    static void Route2()
+    static void Route3Prologue()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Modern Jazz Samba.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Modern Jazz Samba.mp3");
 
-        Person captain = new Person("Captain x", ConsoleColor.DarkRed, null);
-        Person carl = new Person("Carl", ConsoleColor.DarkGreen, null);
+        Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
+        Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
 
         Narrate("A pirate ship approches!");
         captain.Say("LAND HO!");
         captain.Say("Ahoy, me hearties!");
+        carl.Say("Make way for the captain!");
         captain.Say("Ay, a bumbling scallywag!");
-        Player.Say($"The name's, {Player.Name}!");
-        captain.Say("That's not a very piratey name.");
+        Player.Say($"The name's {Player.Name}!");
+        carl.Say("That's not a very piratey name.");
         Player.Say("That's because I don't play pirates anymore.");
         captain.Say("Crew, capture this bafoon!");
 
         Player.Say("Oh for pity sake.");
-        Narrate("The crew drag you onto their ship, and tie you up.");
+        Narrate("The crew drag you onto their ship, and tie you to the mast.");
         Narrate("They proceed to pillage the island.");
 
         Thread.Sleep(1000);
-        CenterText(Build("Days pass..."), time: 2000, audioLocation: "DaysPass.wav");
+        AudioPlaybackEngine.Instance.PauseLoopingMusic();
+        MainConsole.Clear();
+        CenterText(Build("Days pass..."), time: 2000, audioLocation: @"Sounds\DaysPass.wav"); MainConsole.Clear();
+        AudioPlaybackEngine.Instance.ResumeLoopingMusic();
 
         Narrate("The crew return, rather empty-handed, bar a couple bananas.");
         captain.Say("Me hearties, this island sucks.");
@@ -1852,26 +1879,618 @@ ClearKeyBuffer();
         Narrate("The ship sails away from the island.");
 
         Thread.Sleep(1000);
-        CenterText(Build("Days pass..."), time: 2000, audioLocation: "DaysPass.wav");
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+        MainConsole.Clear();
+        CenterText(Build("Days pass..."), time: 2000, audioLocation: @"Sounds\DaysPass.wav"); MainConsole.Clear();
+    }
+    static void Route3()
+    {
+        //Route3Prologue();
+        Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
+        Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
 
-        AudioPlaybackEngine.Instance.PlayLoopingMusic("Captain Scurvy.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Captain Scurvy.mp3");
+        captain.Say("SCRUB THE DECK!");
+        ScrubTheDeck();
+        Console.SetCursorPosition(0, 1);
+        captain.Say("Shiver me timbers!");
+        Thread.Sleep(500);
+        captain.Say("IS WHAT I WOULD SAY IF YE MATEYS WEREN'T SO SLOW!", sleep:30);
+        Thread.Sleep(1000);
 
-        captain.Say("SCRUB THE DECKS!");
+        captain.Say("NOW CLIMB THE RIGGING!");
+        ClimbTheRigging();
 
-        captain.Say("CLIMB THE RIGGINGS!");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Modern Jazz Samba.mp3");
+        Player.Name = "Cutlass " + Player.Name;
+
+        captain.Say("Arggg, ye beat me fellow pirateers!");
+        Player.Say("Blimey! Me lily-livered, bilge-sucking hearties are soon-to-be shark bait!");
+        captain.Say($"Avast ye, crew! {Player.Name} reckons he can plunder all ye booties!");
+        Player.Say("I didn't say that!");
+        captain.Say("Well it be what I heard!");
+        carl.Say("I'll fight 'em Cap'n!");
+        captain.Say($"Well so it be! {carl.Name} shall battle {Player.Name}!");
+        Player.Say("Oh no");
+
+        if (PirateBattle())
+        {
+            MainConsole.Clear();
+            captain.Say($"Ay, {Player.Name} ye truly were the stronger pirate.");
+            Player.Say("ARG! I KNEW IT FROM THE START!");
+            Narrate("You begin an unstoppable pirating career, collecting booty and tracking down treasure.");
+            Narrate("Soon Captain Blackbeard retires and now resides in a care home.");
+            Narrate("You, however, continued your pirating to your very last breath.");
+            Thread.Sleep(1000);
+            throw new WonGameException(2);
+        }
+        else
+        {
+            captain.Say("WALK THE PLANK YOU RAPSCALLION!");
+            carl.Say("Dead men tell no tales!");
+            Player.Say("Please! Don't make me do it!");
+            captain.Say("Any last words?");
+            Player.Say("");
+            ReadChars(10);
+            captain.Say("DONT REMEMBER ASKING!", sleep: 20);
+            Thread.Sleep(500);
+            Narrate("The captain shoves you onto the plank and forces you to walk.");
+            Narrate("You walk the plank.");
+            Narrate("You fall.");
+            Narrate("You survive.");
+            Narrate("With a minor major interior exterior concussion.");
+            AddCharisma(-50);
+            throw new NewGameException();
+        }
+    }
+    static void DrawDeck(int[,] map)
+    {
+        MainConsole.Refresh();
+        Console.CursorVisible = false;
+        Console.SetCursorPosition(0, 5);
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.WriteLine(new String('-', 12));
+        for (int row = 0; row < 6; row++)
+        {
+            Console.Write("|");
+            for (int col = 0; col < 10; col++)
+            {
+                switch (map[row, col])
+                {
+                    case 0:
+                        Console.Write(" "); break;
+                    case 1:
+                        Console.Write("#"); break;
+                }
+            }
+            Console.WriteLine("|");
+        }
+        Console.Write(new String('-', 12));
+    }
+    static void ScrubTheDeck()
+    {
+        int[,] deck = new int[6, 10] { { 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+                                       { 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 },
+                                       { 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 },
+                                       { 0, 1, 0, 0, 0, 0, 0, 0, 0, 0 },
+                                       { 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 },
+                                       { 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 } };
+
+        DrawDeck(deck);
+        Print("§(8)Press [SPACE] as fast as you can to scrub the dirt off the deck.", 1, 0, Console.WindowHeight - 3);
+
+        for (int i = 5; i >= 0; i--)
+        {
+            MainConsole.Refresh(); // deletes everything, then rewrites only the logged messages.
+            DrawDeck(deck);
+            int spaceCount = 0;
+            while (spaceCount < 5)
+            {
+                if (Console.ReadKey(true).Key == ConsoleKey.Spacebar) { spaceCount++; }
+            }
+            for (int j = 0; j < 9; j++)
+            {
+                deck[i, j] = 0;
+            }
+        }
+
+
+    }
+    static void UpdateRigging(int[,] map, int playerDestination, int p1destination, int p2destination)
+    {
+        // p1 is on rigging [0], player is on rigging [3], p2 is on rigging [6]
+        int[] emptyRigging = new int[17] { 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0 };
+
+        if (playerDestination != 16) // Don't update previous position if previous is out of bounds       
+        {
+            map[playerDestination + 1, 3] = emptyRigging[playerDestination + 1];
+        }
+        map[playerDestination, 3] = 4;
+        map[p1destination + 1, 0] = emptyRigging[p1destination + 1];
+        map[p1destination, 0] = 3;
+        map[p2destination + 1, 6] = emptyRigging[p2destination + 1]; // reset previous position
+        map[p2destination, 6] = 3;                                  // update new position
+    }
+    static void DrawRigging(int[,] map)
+    {
+        MainConsole.Refresh();
+        Console.CursorVisible = false;
+        Console.SetCursorPosition(0, 5);
+
+        for (int row = 0; row < 17; row++)
+        {
+            for (int col = 0; col < 7; col++)
+            {
+                Console.ForegroundColor = ConsoleColor.White;
+                switch (map[row, col])
+                {
+                    case 0:
+                        Console.Write(" "); break;
+                    case 1:
+                        Console.Write("-"); break;
+                    case 2:
+                        Console.Write("|"); break;
+                    case 3:
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Write("☻"); break;
+                    case 4:
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write("☻"); break;
+                }
+            }
+            Console.WriteLine("");
+        }
+    }
+    static void ClimbTheRigging()
+    {
+        MainConsole.Refresh();
+
+        // finish, 10 rope, start, 5 empty space
+        int[,] map = new int[17, 7] {
+            { 1, 1, 1, 1, 1, 1, 1 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 2, 0, 0, 2, 0, 0, 2 },
+            { 1, 1, 1, 1, 1, 1, 1 },
+            { 3, 0, 0, 0, 0, 0, 3 },
+            { 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 0, 0, 0, 0 },
+            { 0, 0, 0, 4, 0, 0, 0 } };
+
+        int player = 16;
+        int pirate1 = 12;
+        int pirate2 = 12;
+
+        Print("§(8)Press [SPACE] as fast as you can to climb faster that the other pirates.", 1, 0, Console.WindowHeight-3);
+        Print("§(8)Walk to the start line to begin the race.");
+
+        while (player > 12)
+        {
+            DrawRigging(map);
+            bool pressedSpace = false;
+            ClearKeyBuffer();
+            while (!pressedSpace)
+            {
+                if (Console.ReadKey(true).Key == ConsoleKey.Spacebar) { pressedSpace = true; }
+            }
+            map[player, 3] = 0;
+            player--;
+            map[player, 3] = 4;
+        }
+
+        DrawRigging(map);
+        CachedSound countdown = new CachedSound(@"Sounds\RaceCountdown.wav");
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+        AudioPlaybackEngine.Instance.PlaySound(countdown);
+        Print("§(4)3 ", 0); Thread.Sleep(1000);
+        Print("§(4)2 ", 0); Thread.Sleep(1000);
+        Print("§(4)1 ", 0); Thread.Sleep(1000);
+        Print("§(10)GO! ", 2);
+        ClearKeyBuffer();
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captian Trillian.mp3");
+        while (player > 0)
+        {
+            MainConsole.Refresh(); // deletes everything, then rewrites only the logged messages.
+            DrawRigging(map);
+            bool pressedSpace = false;
+            while (!pressedSpace)
+            {
+                if (Console.ReadKey(true).Key == ConsoleKey.Spacebar) { pressedSpace = true; }
+            }
+            player--;
+            int luck = rand.Next(0, 101);
+            if (luck < 70) { pirate1--; pirate2--; }
+            else if (luck < 80) { pirate1--; }
+            else if (luck < 90) { pirate2--; }
+            // else no priates move, lucky you!
+            UpdateRigging(map, player, pirate1, pirate2);
+        }
+
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+        MainConsole.Clear();
+        
+        if (pirate1 == 0 || pirate2 == 0)
+        {
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Man down.mp3");
+            Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
+            captain.Say($"Oi! {Player.Name} The other pirates beat you!");
+            captain.Say("I always knew you were a lowlife slacker!");
+            captain.Say("Crew, show the rapscallion what we do with slackers!");
+            Narrate("The pirates ransack all your belongings.");
+            Narrate("They make you walk the plank.");
+            Narrate("You fall.");
+            Narrate("You survive.");
+            Narrate("With a minor major interior exterior concussion.");
+            AddCharisma(-50);
+            throw new NewGameException();
+        }
+    }
+
+    // Pirate Battle
+    static int carlHealth = 100;
+    static int playerHealth = 100;
+    static void AddToHealth(string person, int health)
+    {
+        if (person.ToLower() == "carl")
+        {
+            carlHealth = (carlHealth + health > 100) ? 100 : (carlHealth + health < 0) ? 0 : carlHealth + health;
+            string sign = (health < 0) ? "-" : "+";
+            string color = (health < 0) ? "10" : "12";
+            Narrate($"§({color}){sign}{Math.Abs(health)} Health.", sleep: 55);
+        }
+        else
+        {
+            playerHealth = (playerHealth + health > 100) ? 100 : (playerHealth + health < 0) ? 0 : playerHealth + health;
+            string sign = (health < 0) ? "-" : "+";
+            string color = (health < 0) ? "12" : "10";
+            Narrate($"§({color}){sign}{Math.Abs(health)} Health.", sleep: 55);
+        }
+        DrawHealth();
+    }
+    static void DrawHealth()
+    {
+        string longestName; string longestNameHealth; ConsoleColor longestNameColor;
+        string shortestName; string shortestNameHealth; ConsoleColor shortestNameColor;
+
+        if (Player.Name.Length > carl.Name.Length)
+        {
+            longestName = Player.Name;
+            longestNameHealth = $"{new String(' ', 3 - playerHealth.ToString().Length)}{playerHealth}";
+            longestNameColor = Player.Color;
+            shortestName = carl.Name;
+            shortestNameHealth = $"{new String(' ', 3 - carlHealth.ToString().Length)}{carlHealth}";
+            shortestNameColor = carl.Color;
+        }
+        else
+        {
+            longestName = carl.Name;
+            longestNameHealth = $"{new String(' ', 3 - carlHealth.ToString().Length)}{carlHealth}";
+            longestNameColor = carl.Color;
+            shortestName = Player.Name;
+            shortestNameHealth = $"{new String(' ', 3 - playerHealth.ToString().Length)}{playerHealth}";
+            shortestNameColor = Player.Color;
+        }
+        shortestName += new String(' ', longestName.Length - shortestName.Length);
+
+
+        int resetX = Console.CursorLeft; int resetY = Console.CursorTop; //total width: 12 Player.Name.Length 345678
+        int totalWidth = longestName.Length + 8;                         //             | ReallyLongPlayerName 100 |
+        int xIndent = Console.WindowWidth - totalWidth;
+
+        Console.ForegroundColor = ConsoleColor.White;
+        Console.SetCursorPosition(xIndent, 0);
+        Console.Write(new String('-', totalWidth));
+        Console.SetCursorPosition(xIndent, 1);
+
+        //Console.Write($"| {longestName} {longestNameHealth} |");
+        Console.Write("| "); Console.ForegroundColor = longestNameColor;
+        Console.Write($"{longestName} {longestNameHealth}"); Console.ForegroundColor = ConsoleColor.White; Console.Write(" |");
+        Console.SetCursorPosition(xIndent, 2);
+
+        //Console.Write($"| {shortestName} {shortestNameHealth} |");
+        Console.Write("| "); Console.ForegroundColor = shortestNameColor;
+        Console.Write($"{shortestName} {shortestNameHealth}"); Console.ForegroundColor = ConsoleColor.White; Console.Write(" |");
+        Console.SetCursorPosition(xIndent, 3);
+        Console.Write(new String('-', totalWidth));
+
+        Console.SetCursorPosition(resetX, resetY);
+    }
+
+    static bool carlDistracted = false;
+    static bool playerDistracted = false;
+    static bool surrendered = false;
+    static ConsoleMessage[]? weapons;
+    static ConsoleMessage[] goodInsults = Build("You fight like a dairy farmer!", "I've spoken with apes more polite than you!", "I once owned a dog that was smarter than you.",
+                                                "You're not invited to my birthday party!", "You're no match for my brains you poor fool.", "You have the manners of a beggar.");
+    static ConsoleMessage[] badInsults = Build("You're as blind as a bat!", "You're as ugly as an elephant.", "Eveything you say is stupid!", "You probably can't even go cross-eyed!",
+                                               "You coward!", "You make me sick!", "I'd like my steak chicken-fried.", "I bet your wardrobe isn't even color-coordinated!");
+    static Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
+    static bool PirateBattle()
+    {
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Bushwick Tarantella.mp3");
+        MainConsole.Clear();
+        
+        carl.Say("This is the end for you, you gutter-crawling cur!");
+        weapons = ConvertStringArray(inventory.Keys.ToArray());
+        DrawHealth();
+        while (carlHealth > 1 && playerHealth > 1 && !surrendered)
+        {
+            if (playerDistracted)
+            {
+                Narrate("You are too distracted to make a move!", sleep:55);
+                playerDistracted = false;
+            }
+            else
+            {
+                PlayerAttack();
+            }
+
+            if (carlHealth < 1 || playerHealth < 1 || surrendered) { break; }
+
+            if (carlDistracted)
+            {
+                Narrate("Carl is too distracted to make a move!", sleep: 55);
+                carlDistracted = false;
+            }
+            else
+            {
+                CarlAttack();
+            }
+        }
+
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+
+        if (surrendered)
+        {
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Man down.mp3");
+            carl.Say("Ahargh! I knew ye were a meer picaroon! Scupper that scoundrel!");
+            Thread.Sleep(1000);
+            return false;
+        }
+        else if (playerHealth < 1)
+        {
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Man down.mp3");
+            Player.Say("By golly gosh you've made me toast!");
+            carl.Say("I always knew you weren't a real pirate!");
+            Thread.Sleep(1000);
+            return false;
+        }
+        else
+        {
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Vivacity.mp3");
+            carl.Say("Aye, I've been bested. Me booty be the Captains.");
+            Narrate("Carl yields.");
+            Thread.Sleep(1000);
+            return true;
+        }
+    }
+    static void PlayerAttack()
+    {
+        weapons ??= new ConsoleMessage[1]; // weapons should never be null at this point. This is for the sake of stopping it from crying about null dereferences. 
+        switch (Choose(Build("Attack", "Use item", "Insult", "Surrender"), drawHealth: true))
+        {
+            case 0: int choice = Choose(weapons, drawHealth: true);
+                if (choice == -1) { } // escape
+                switch (weapons[choice].Contents) // attack
+                {
+                    case "Gold":
+                        Narrate("You hurl a handful of gold coins at Carl.", sleep:55);
+                        carl.Say("Ouch!");
+                        AddToHealth("carl", -15);
+                        break;
+                    case "Sticks":
+                        Narrate("You toss the stick at Carl.", sleep: 55);
+                        carl.Say("Nice throw.");
+                        AddToHealth("carl", -8);
+                        break;
+                    case "Coconuts":
+                        Narrate("You lob a coconut at Carl.", sleep: 55);
+                        carl.Say("ARGH!");
+                        Narrate("§(12)CRITICAL HIT!", sleep: 55);
+                        AddToHealth("carl", -10);
+                        break;
+                    case "Used TP":
+                        AudioPlaybackEngine.Instance.PauseLoopingMusic();
+                        Narrate("You apply the used toilet paper to Carl."); carl.Voice = new CachedSound(@"Sounds\VoiceDave.wav");
+                        carl.Say("...", sleep: 150); carl.Voice = null;
+                        Narrate("§(12)CRITICAL HIT!", sleep: 30);
+                        AddToHealth("carl", -50);
+                        AudioPlaybackEngine.Instance.ResumeLoopingMusic(); break;
+                    case "Diamonds":
+                        Narrate("You propel a priceless diamond at Carl.", sleep: 55);
+                        carl.Say("Thanks!");
+                        AddCharisma(-20);
+                        AddToHealth("carl", 20);
+                        break;
+                } break;
+
+            case 1:
+                switch (weapons[Choose(weapons, drawHealth: true)].Contents) // use item
+                {
+                    case "Gold":
+                        Narrate("You... Eat the gold?", sleep: 55);
+                        Player.Say("Ouch!");
+                        AddToHealth("player", -10);
+                        break;
+                    case "Sticks":
+                        Narrate("You arrange the sticks into a pretty pattern.", sleep: 55);
+                        Narrate("§(10)Carl is distracted for 1 round!", sleep:55);
+                        carlDistracted = true; break;
+                    case "Coconuts":
+                        Narrate("You eat the coconut.", sleep:55);
+                        Player.Say("Mmm! Delicious!");
+                        AddToHealth("player", 30);
+                        break;
+                    case "Used TP":
+                        AudioPlaybackEngine.Instance.PauseLoopingMusic();
+                        Narrate("You... use the toilet paper."); carl.Voice = new CachedSound(@"Sounds\VoiceDave.wav");
+                        carl.Say("...", sleep: 150); carl.Voice = null;
+                        Narrate("Carl is disgusted.");
+                        Narrate("§(10)Carl is distracted for 1 round!", sleep:55);
+                        carlDistracted = true;
+                        AudioPlaybackEngine.Instance.ResumeLoopingMusic(); break;
+                    case "Diamonds":
+                        Narrate("You stare at the diamond, amazed by it's reflectivity.", sleep:55);
+                        Narrate("§(12)You are distracted for 1 round!", sleep:55);
+                        playerDistracted = true; break;
+                }
+                break;
+
+            case 2:
+                ConsoleMessage[] insults = Build(goodInsults[rand.Next(0, goodInsults.Length)], badInsults[rand.Next(0, badInsults.Length)], badInsults[rand.Next(0, badInsults.Length)]);
+                insults = insults.OrderBy(x => rand.Next()).ToArray(); // randomise order so correct isnt always first
+                ConsoleMessage insult = insults[SimpleChoose(insults, drawHealth: true)];
+
+                Player.Say(insult.Contents);
+
+                if (goodInsults.Contains(insult))
+                {
+                    Narrate("Carl begins to cry. You hurt his feelings.", sleep: 55);
+                    AddToHealth("carl", -10);
+                }
+                else
+                {
+                    Narrate("Your insult was so laughably bad that Carl's charisma went up.", sleep: 55);
+                    AddToHealth("carl", 20);
+                }
+                break;
+
+            case 3: surrendered = true; break;
+        }
+    }
+    static void CarlAttack()
+    {
+        int choice = rand.Next(0, 101);
+        if (choice < 50) // 50% chance enemy atttacks
+        {
+            switch(rand.Next(0, 4))
+            {
+                case 0: // sword
+                    Narrate("Carl attempts to strike you with his sword.", sleep:55);
+                    if (rand.Next(0,11) < 8) { Narrate("He missed."); }
+                    else
+                    {
+                        Narrate("He hits! Inflicting a critical wound!", sleep:55);
+                        AddToHealth("player", -50); // 50% attacks * 25% uses sword * 20% lands hit = 2.5% chance he hits you
+                    } break;
+                case 1: // gold
+                    Narrate("Carl hurls a handful of gold coins at you.", sleep:55);
+                    Player.Say("Ouch!"); 
+                    AddToHealth("player", -10);
+                    break;
+
+                case 2: // banana
+                    Narrate("Carl lobs a bunch of bananas at you.", sleep:55);
+                    Player.Say("ARGH!"); 
+                    Narrate("§(12)CRITICAL HIT!", sleep: 55);
+                    AddToHealth("player", -30);
+                    break;
+
+                case 3: // canonball
+                    Narrate("Carl attempts to lift a canonball to throw at you.", sleep: 55);
+                    Narrate("The ball slips out of his hands, landing on his feet and stunning him.", sleep: 55);
+                    Narrate("§(10)Carl is distracted for 1 round!", sleep:55);
+                    carlDistracted = true; break;
+            }
+        }
+
+        else if (choice < 75) // 25% chance he uses an item
+        {
+            switch (rand.Next(0, 3))
+            {
+                case 0: // banana
+                    Narrate("Carl eats a banana.", sleep:55);
+                    carl.Say("Mmm! Delicious!");
+                    AddToHealth("carl", 20);
+                    break;
+                case 1: // banana
+                    Narrate("Carl... Eats some gold coins?", sleep:55);
+                    carl.Say("Ouch!");
+                    AddToHealth("carl", -10);
+                    break;
+                case 2: // bandana
+                    Narrate("Carl reveals from his pockets... a bandana.", sleep:55);
+                    Narrate("It had a maths equation written on it. You can't stop yourself from solving it.", sleep:55);
+                    Narrate("§(12)You are distracted for 1 round!", sleep:55);
+                    playerDistracted = true; break;
+            }
+        }
+        else // 25% chance he insults
+        {
+            string[] insults = new string[] { goodInsults[rand.Next(0, goodInsults.Length)].Contents, badInsults[rand.Next(0, badInsults.Length)].Contents, badInsults[rand.Next(0, badInsults.Length)].Contents };
+            string insult = insults[rand.Next(0, 3)];
+
+            carl.Say(insult);
+
+            if (insult == insults[0]) // if carl chose good insult (33% chance)
+            {
+                Narrate("That one hit a little too close to home. You begin crying.", sleep:55);
+                AddToHealth("player", -10);
+            }
+            else
+            {
+                Narrate("Carl's insult was so laughably bad that your charisma went up.", sleep:55);
+                AddCharisma(20);
+                AddToHealth("player", 20);
+            }
+        }
     }
 
 
-    static void ResultsScreen()
+    static void ResultsScreen(int route)
     {
+        string totalTime = $"{(DateTime.Now - gameStarted):hh\\:mm\\:ss}";
         AudioPlaybackEngine.Instance.StopLoopingMusic();
+        if (route != -1) { AudioPlaybackEngine.Instance.PlayLoopingMusic(@$"Music\9{route} Results Screen.mp3"); }
+        MainConsole.Clear();
 
-        // results roundup yay
+        Print("Your Life as a Cast Away", 2);
+
+        Narrate($"§(12)Final Charisma§(15): {stats[1]}");
+        Narrate($"§(14)Gold collected§(15): 1");
+        Narrate($"§(15)Time taken: {totalTime}");
+        switch (route)
+        {
+            case 0:
+                Narrate("§(15)Times fallen off a boat: 1");
+                Narrate("§(15)Times saved by the bystander watching you get pushed off the boat: 1");
+                break;
+                
+            case 1:
+                Narrate($"§(15)Times been scammed: 1");
+                // need more here
+                break;
+            case 2:
+                Narrate($"§(15)Monkeys beaten in a insult battle: 1");
+                Narrate($"§(15)Monkeys beaten in a race: 2");
+                Narrate($"§(15)Volcanoes merely survived: 1");
+                break;
+            case 3:
+                Narrate($"§(15)Pirates beaten in a battle: 1");
+                Narrate($"§(15)Pirates beaten in a race: 2");
+                Narrate($"§(15)Decks scrubbed: 1");
+                break;
+        }
+
+        Print("", 1);
+        Print("§(8)Press any key to exit.");
+        Console.ReadKey();
+
+        MainConsole.Clear();
     }
     public class NewGameException : Exception { }
     static void Main(string[] args)
     {
         bool stillPlaying = true;
+        int route = -1;
         while (stillPlaying)
         {
             try
@@ -1882,13 +2501,14 @@ ClearKeyBuffer();
             {
                 AudioPlaybackEngine.Instance.StopLoopingMusic();
             }
-            catch (WonGameException)
+            catch (WonGameException e)
             {
                 stillPlaying = false;
+                route = e.Route;
             }
         }
 
-        ResultsScreen();
+        ResultsScreen(route);
     }
 
     /* OHMYGOODNESSGRACIOUSME a main method in ONLY 1 LINE WITH ONLY 3 SPACES AND ONLY 4 WORDS AND ONLY 179 CHARACTERS?!?!?!???!
