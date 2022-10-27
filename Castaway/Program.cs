@@ -769,6 +769,14 @@ class Program
         MainConsole.Clear();
         gameStarted = DateTime.Now;
 
+        /* debug
+        AddToInventory("Gold", 100);
+        AddToInventory("Diamonds", 2);
+        AddToInventory("Sticks", 12);
+        AddToInventory("Rope", 12);
+        AddToInventory("Used TP", 1);
+        AddToInventory("Roblox gift card", 1);
+        */
         
         Prologue();
 
@@ -1168,30 +1176,35 @@ class Program
                 case 0: Shop(); break;
                 case 1: Hotel(); break;
                 case 2: ViewStats(); ViewInventory(); break;
-                case 3: if (options[3] == (ConsoleMessage)"Search Further East")
+                case 3:
+                    if (options[3].Contents == "Search Further East")
                     {
-                        if (EastSide())
+                        if (EastSide()) // east side returns true once player has spoken with scammer with sufficient materials
                         {
-                            options[3] = "§(13)Set sail";
-                        };
+                            options[3] = new ConsoleMessage("Set sail", ConsoleColor.Magenta);
+                        }
                         skipRamble = true;
                     }
-                    else
+                    else // If they have sufficient materials and have spoken with scammer
                     {
                         finished = true;
                     }
                     break;
             }
-
             if (!skipRamble) { MainConsole.Clear(); }
         }
 
-        Narrate("You wander towards the boat to find a shambolic raft");
+        Narrate("You wander towards the bay to find a shambolic raft.");
         Player.Say("Well I've not really got a choice, have I?");
         Narrate("You board the boat and set sail.");
         Thread.Sleep(1000);
 
+        MainConsole.Clear();
+
         SailBoat();
+        OtherIsland();
+
+        throw new WonGameException(1);
     }
     static bool EastSide()
     {
@@ -1282,16 +1295,19 @@ class Program
 
         if (knowledge.Contains("Scammed"))
         {
-            if (ItemCount("Old map") > 0 && ItemCount("Rope") > 0)
+            if ((ItemCount("Sticks") > 0 && ItemCount("Rope") > 0) || ItemCount("Roblox gift card") > 0 || ItemCount("Used TP") > 0)
             {
-                chanelle.Say("Who is it?");
-                Player.Say($"It's {Player.Name} again.");
-                chanelle.Say("Ugh how badly do you want this boat?");
-                Player.Say("I already payed for it!");
-                chanelle.Say("Fine, fine, don't get your knickers in a twist.");
-                chanelle.Say("I've docked it at the island bay. Take it! I don't want it.");
-                Narrate("Chanelle shuts the door on you");
-                return true;
+                if (ItemCount("Old map") > 0)
+                {
+                    chanelle.Say("Who is it?");
+                    Player.Say($"It's {Player.Name} again.");
+                    chanelle.Say("Ugh how badly do you want this boat?");
+                    Player.Say("I already payed for it!");
+                    chanelle.Say("Fine, fine, don't get your knickers in a twist.");
+                    chanelle.Say("I've docked it at the island bay. Take it! I don't want it.");
+                    Narrate("Chanelle shuts the door on you");
+                    return true;
+                }
             }
 
             chanelle.Say("Sorry! I'm busy right now!");
@@ -1341,6 +1357,10 @@ class Program
         }
         return false;
     }
+
+    // also had pencil: 3 but removed for now
+    static Tuple<ConsoleMessage,int>[][] shop = BuildShelves(NewShelf(NewItem("Bunch o' bananas", 5), NewItem("Teddy bear", 10), NewItem("Shovel", 20)),
+                                                             NewShelf(NewItem("Roblox gift card", 100), NewItem("Paper", 3), NewItem("Rope", 5)));
     static void Shop()
     {
         MainConsole.Clear();
@@ -1358,7 +1378,7 @@ class Program
                 Player.Say("Chanelle took it from me!");
                 Player.Say("She said she'd give me a boat in return and then kicked me out!");
                 mackenzie.Say("Oh you can't trust that Chanelle.");
-                mackenzie.Say("If you're lookign to get off this island, you'll be needing §(13)supplies §(4)from me!");
+                mackenzie.Say("If you're looking to get off this island, you'll be needing §(13)supplies §(4)from me!");
             }
             else
             {
@@ -1372,35 +1392,36 @@ class Program
         {
             mackenzie.Say("You'll need a §(13)boat§(4), a §(13)map§(4), and you can get §(13)supplies §(4)from me!");
         }
-
-        var shop = BuildShelves(NewShelf(NewItem("Bunch o' bananas", 5), NewItem("Teddy bear", 10), NewItem("Pencil", 3)),
-                                NewShelf(NewItem("Roblox gift card", 100), NewItem("Paper", 3), NewItem("Rope", 5)));
+        
 
         (int shelfI, int itemI) = ShopMenu(shop);
         string item = shop[shelfI][itemI].Item1.Contents;
         int cost = shop[shelfI][itemI].Item2;
 
-        if (shelfI != -1)
+        if (shelfI != -1 && shop[shelfI][itemI].Item1.Contents == "---")
         {
-
             if (ItemCount("Gold") < cost)
             {
                 mackenzie.Say($"Sorry, you only have §(14){ItemCount("Gold")} gold§(4).");
                 mackenzie.Say($"The {item} costs §(14){cost} gold§(4).");
-                // earn money
+                // earn money?
             }
             else
             {
                 mackenzie.Say($"Are you sure you would like to buy {item} for §(14){cost} gold§(4)?");
                 switch (Choose(Build($"Yes, buy the {item}", "No, I don't want it")))
                 {
-                    case 0: Buy(cost); AddToInventory(item, 1); break;
+                    case 0:
+                        Buy(cost);
+                        AddToInventory(item, 1);
+                        shop[shelfI][itemI] = NewItem("---", 0);
+                        break;
                 }
             }
-
-            Narrate("§(8)Press any key to exit the shop.");
-            Console.ReadKey();
         }
+
+        Narrate("§(8)Press any key to exit the shop.");
+        Console.ReadKey();
 
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
     }
@@ -1561,7 +1582,214 @@ class Program
     }
     static void SailBoat()
     {
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Salty Ditty.mp3");
 
+        Player.Say("So the map seems to say I go §(13)right§(11), then §(13)left§(11), another §(13)left§(11), then §(13)forward§(11).");
+        Player.Say("Alright! I'm facing North right now, so...");
+        bool failed = false;
+
+        ConsoleMessage[] choices = Build("Backward", "Right", "Forward", "Left");
+        int choice = Choose(choices);
+        if (choice != 1) { failed = true; }
+        Player.Say($"So I guess I'll go {choices[choice].Contents} first.");
+
+        choices = Build("Onward", "Up", "North", "Staight");
+        choice = Choose(choices);
+        if (choice != 2) { failed = true; }
+        Player.Say($"Then I'll go {choices[choice].Contents}.");
+
+        Player.Say("Might help to know I'm right handed.");
+        choices = Build("Perpendicular weak hand", "Reverse", "Sideways strong hand", "Above");
+        choice = Choose(choices);
+        if (choice != 0) { failed = true; }
+        Player.Say($"Now I'll go in a {choices[choice].Contents} sort of direction.");
+
+        choices = Build("Dexter", "Pursue", "Sinister", "Recede");
+        choice = Choose(choices);
+        if (choice != 1) { failed = true; }
+        Player.Say($"And finally, I choose to {choices[choice].Contents}!");
+
+
+        if (failed)
+        {
+            knowledge.Add("Failed map");
+            Player.Say("Well it doesn't really look like I've gone the right way...");
+            Player.Say("But there is a massive plot of land to my left...");
+            Player.Say("It's probably that way.");
+        }
+        else
+        {
+            Player.Say("Huzzah! I have bested the map!");
+            Player.Say("I see land right in front of me.");
+        }
+
+        Narrate("All of a sudden, you hear a perculiar sound...");
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+        AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\CartoonBoing.wav"), true);
+        Thread.Sleep(500);
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Thinking Music.mp3");
+        Player.Say("What in the world could that be?");
+        Narrate("You feel yourself descending.");
+        Player.Say("Hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm...");
+        Player.Say("OH WAIT I'M SINKING!", sleep:30);
+
+        SinkingShip();
+    }
+    static void SinkingShip()
+    {
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Mistake the Getaway.mp3");
+        MainConsole.Clear();
+        Print($"§(11){Player.Name}: OH WAIT I'M SINKING!");
+        Narrate("Choose an item to fix the leakage.");
+
+        // to beat this minigame inventory must contain: sticks and rope || used TP || Roblox gift card
+
+        ConsoleMessage[] items = ConvertStringArray(inventory.Keys.ToArray());
+
+        bool sticksApplied = false;
+        bool ropeApplied = false;
+        while (!(sticksApplied && ropeApplied))
+        {
+            int itemChosen = Choose(items.Take(4).ToArray());
+            switch (items[itemChosen].Contents)
+            {
+                case "Gold":
+                    Narrate("You... throw the gold at the leak?");
+                    break;
+                case "Coconuts":
+                    Narrate("You lob a coconut at the leak. It's now leaking at twice the speed.");
+                    break;
+                case "Bunch o' bananas":
+                    Narrate("You lob a banana at the leak. It's now leaking at one and a half times the speed.");
+                    break;
+                case "Diamonds":
+                    Narrate("You throw a priceless diamond at the leak. It does nothing.");
+                    AddCharisma(-20);
+                    break;
+                case "Teddy bear":
+                    Narrate("You throw a teddy bear at the leak. It does nothing.");
+                    Narrate("A child could've had that.");
+                    AddCharisma(-5);
+                    break;
+                case "Paper":
+                    Narrate("You place a piece of paper of the leak.");
+                    Narrate("The paper gets wet.");
+                    break;
+                case "Pencil":
+                    Narrate("You pierce another leak in the boat with a pencil.");
+                    Narrate("The ship is now sinking at one and three quarters the speed.");
+                    break;
+                case "Shovel":
+                    Narrate("You lob a shovel at the leak.");
+                    Narrate("The ship is now sinking at quadruple the speed.");
+                    break;
+                case "Roblox gift card":
+                    Narrate("You administer the Roblox gift card to the leak, tears in your eyes.");
+                    Player.Say("I payed for those Robux.");
+                    Narrate("You begin crying. Miraculously, the Roblox gift card fixes the leak!");
+                    sticksApplied = true; ropeApplied = true;
+                    break;
+                case "Used TP":
+                    Narrate("You carefully apply the used toilet paper to the leak.");
+                    Narrate("It works incredibly well.");
+                    sticksApplied = true; ropeApplied = true;
+                    break;
+                case "Sticks":
+                    sticksApplied = true;
+                    if (!ropeApplied) { Narrate("The sticks help, they could use some §(5)rope§(7)."); }
+                    else { Narrate("The sticks seal the leak."); }
+                    break;
+                case "Rope":
+                    ropeApplied = true;
+                    if (!sticksApplied) { Narrate("The rope helps, it could use some §(5)sticks§(7)."); }
+                    else { Narrate("The sticks seal the leak."); }
+                    break;
+            }
+
+            // remove their choice from their inventory
+            items = items.Where((source, index) => index != itemChosen).ToArray();
+        }
+        Thread.Sleep(1000);
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+    }
+    static void OtherIsland()
+    {
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Beach Sounds.wav");
+        Player.Say("Yay, I'm nearly at the island!");
+        Narrate("The boat inches closer to the island. As soon as it makes contact it collapses.");
+        AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\WoodCrumble.wav"), true);
+        //Player.Voice = new CachedSound(@"Sounds\VoiceYou.wav");
+        Player.Say("...", sleep: 150);
+        //Player.Voice = null;
+        Thread.Sleep(1000);
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Cottages.wav");
+        Player.Say("Hmmm, what do I do now?");
+        Narrate("You look at the map very closely.");
+        Thread.Sleep(1000);
+        Player.Say("Ah! An X marks the spot!");
+
+        if (ItemCount("Shovel") < 0 && ItemCount("Sticks") < 0)
+        {
+            Player.Say("But I have nothing to dig it up with...");
+            Player.Say("I guess I'll have to forage for sticks");
+            while (!inventory.ContainsKey("Sticks"))
+            {
+                Choose(Build("Forage for sticks"));
+                Forage();
+            }
+            Player.Say("Finally, I can use these sticks to uncover what lays under the X!");
+        }
+        else
+        {
+            Player.Say($"Thank goodness I still have {(ItemCount("Shovel") > 0 ? "this shovel" : "these sticks")}!");
+        }
+
+        Narrate("You guide yourself to the X.");
+        Print("§(8)Press [SPACE] continuously to dig up the sand.");
+        for (int i = 0; i < 4; i++)
+        {
+            int spaceCount = 0;
+            int spacesToBreakSand = 5;
+            while (spaceCount < spacesToBreakSand)
+            {
+                if (Console.ReadKey(true).Key == ConsoleKey.Spacebar) { spaceCount++; }
+                spacesToBreakSand = rand.Next(4, 8);
+            }
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\DigSand.wav"));
+        }
+
+        Person frank = new Person("Frank The Car Dealer", ConsoleColor.DarkBlue, null);
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+        AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\Discovery.wav"), true);
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Arcadia.mp3");
+        Player.Say("OH MY GOODNESS GRACIOUS ME!");
+        Player.Say("IT'S HEAVENLY!");
+        Player.Say("IT'S GLORY EXCEEDES THAT OF MY TOASTER!");
+        Player.Say("IT'S...");
+        Player.Say("IT'S....");
+        AudioPlaybackEngine.Instance.StopLoopingMusic();
+        frank.Say("We've been trying to reach you concerning car's extended warranty.");
+        Player.Say("Ugh thanks for ruining my moment, Frank.");
+        frank.Say("Sorry, but I have a message regarding automotive extended warranties.");
+        //frank.Voice = new CachedSound(@"Sounds\VoiceDave.wav");
+        //Player.Voice = new CachedSound(@"Sounds\VoiceYou.wav");
+        Player.Say("...", sleep: 200);
+        frank.Say("...", sleep: 200);
+        //frank.Voice = null;
+        //Player.Voice = null;
+        AudioPlaybackEngine.Instance.ResumeLoopingMusic();
+        Player.Say("IT'S A SPOON!");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Feelin Good.mp3");
+        Narrate("You love spoons.");
+        Player.Say("YIPEE!");
+        Player.Say("Oh by the way Frank if you take me back home then I'll talk about extending my warranty.");
+        frank.Say("Oooh! Goodie goodie!");
+        Narrate("You and Frank travelled home, and you never had to look back at that island again.");
+        Narrate("You bought an extended warranty for your car, Frank was ecstatic.");
+        Narrate("Greg and Dave went on to push more people off boats, turns out they were hired to do it as the island needed more tourists.");
+
+        Narrate("The end.", sleep: 300);
+        Thread.Sleep(1000);
     }
 
 
@@ -1651,9 +1879,9 @@ class Program
             /*
             map = UpdateMap(map, playerPos, monkeyPos1, monkeyPos2);
             */
-        }
+    }
 
-        DrawMonkeyRace(map);
+    DrawMonkeyRace(map);
         CachedSound countdown = new CachedSound(@"Sounds\RaceCountdown.wav");
         AudioPlaybackEngine.Instance.StopLoopingMusic();
         AudioPlaybackEngine.Instance.PlaySound(countdown);
@@ -1885,7 +2113,7 @@ class Program
     }
     static void Route3()
     {
-        //Route3Prologue();
+        Route3Prologue();
         Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
         Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
 
@@ -1921,8 +2149,9 @@ class Program
             Narrate("You begin an unstoppable pirating career, collecting booty and tracking down treasure.");
             Narrate("Soon Captain Blackbeard retires and now resides in a care home.");
             Narrate("You, however, continued your pirating to your very last breath.");
-            Thread.Sleep(1000);
-            throw new WonGameException(2);
+            Narrate("The end.", sleep: 300);
+            Thread.Sleep(2000);
+            throw new WonGameException(3);
         }
         else
         {
@@ -1979,6 +2208,8 @@ class Program
         DrawDeck(deck);
         Print("§(8)Press [SPACE] as fast as you can to scrub the dirt off the deck.", 1, 0, Console.WindowHeight - 3);
 
+        CachedSound wipeDeck = new CachedSound(@"Sounds\DeckWipe.mp3");
+        CachedSound ding = new CachedSound(@"Sounds\DeckSparkle.mp3");
         for (int i = 5; i >= 0; i--)
         {
             MainConsole.Refresh(); // deletes everything, then rewrites only the logged messages.
@@ -1986,14 +2217,22 @@ class Program
             int spaceCount = 0;
             while (spaceCount < 5)
             {
-                if (Console.ReadKey(true).Key == ConsoleKey.Spacebar) { spaceCount++; }
+                if (Console.ReadKey(true).Key == ConsoleKey.Spacebar)
+                {
+                    // dont do wipe sound every time or it sounds bad
+                    if (spaceCount % 2 == 0) { AudioPlaybackEngine.Instance.PlaySound(wipeDeck); }
+                    spaceCount++;
+                }
             }
+            
             for (int j = 0; j < 9; j++)
             {
                 deck[i, j] = 0;
             }
+            AudioPlaybackEngine.Instance.PlaySound(ding);
         }
 
+        DrawDeck(deck);
 
     }
     static void UpdateRigging(int[,] map, int playerDestination, int p1destination, int p2destination)
@@ -2210,7 +2449,7 @@ class Program
     static ConsoleMessage[]? weapons;
     static ConsoleMessage[] goodInsults = Build("You fight like a dairy farmer!", "I've spoken with apes more polite than you!", "I once owned a dog that was smarter than you.",
                                                 "You're not invited to my birthday party!", "You're no match for my brains you poor fool.", "You have the manners of a beggar.");
-    static ConsoleMessage[] badInsults = Build("You're as blind as a bat!", "You're as ugly as an elephant.", "Eveything you say is stupid!", "You probably can't even go cross-eyed!",
+    static ConsoleMessage[] badInsults = Build("You're as blind as a bat!", "You're as ugly as an elephant.", "Everything you say is stupid!", "You probably can't even go cross-eyed!",
                                                "You coward!", "You make me sick!", "I'd like my steak chicken-fried.", "I bet your wardrobe isn't even color-coordinated!");
     static Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
     static bool PirateBattle()
@@ -2456,7 +2695,7 @@ class Program
 
         Narrate($"§(12)Final Charisma§(15): {stats[1]}");
         Narrate($"§(14)Gold collected§(15): 1");
-        Narrate($"§(15)Time taken: {totalTime}");
+        Narrate($"§(10)Time taken§(15): {totalTime}");
         switch (route)
         {
             case 0:
@@ -2466,7 +2705,12 @@ class Program
                 
             case 1:
                 Narrate($"§(15)Times been scammed: 1");
-                // need more here
+                if (knowledge.Contains("Failed map"))
+                {
+                    Narrate("§(15)Times failed to read a map: 1");
+                }
+                Narrate("§(15)Boat leaks fixed: 1");
+                Narrate("§(15)Automotive warranties extended: 1");
                 break;
             case 2:
                 Narrate($"§(15)Monkeys beaten in a insult battle: 1");
@@ -2481,6 +2725,7 @@ class Program
         }
 
         Print("", 1);
+        ClearKeyBuffer();
         Print("§(8)Press any key to exit.");
         Console.ReadKey();
 
