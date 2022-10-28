@@ -24,7 +24,7 @@ using System.Xml;
 using System.Data;
 using static Castaway.Program.ConsoleMessage;
 using NAudio.SoundFont;
-
+using System.ComponentModel.DataAnnotations;
 
 namespace Castaway;
 class Program
@@ -556,41 +556,37 @@ class Program
 ██║     ██╔══██║╚════██║   ██║   ██╔══██║██║███╗██║██╔══██║  ╚██╔╝  
 ╚██████╗██║  ██║███████║   ██║   ██║  ██║╚███╔███╔╝██║  ██║   ██║   
  ╚═════╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝   
-                                                            "; break;
+                                                                    "; break;
         }
 
         if (center)
         {
-            using (StringReader reader = new StringReader(art))
+            using StringReader reader = new StringReader(art);
+            CachedSound sound = new CachedSound(@"Sounds\DigSand.wav");
+            string? line;
+            while ((line = reader.ReadLine()) != null)
             {
-                CachedSound sound = new CachedSound(@"Sounds\DigSand.wav");
-                string? line;
-                while ((line = reader.ReadLine()) != null)
+                if (speed != 0)
                 {
-                    if (speed != 0)
-                    {
-                        AudioPlaybackEngine.Instance.PlaySound(sound);
-                        int cursorPos = (Console.WindowWidth - line.Length) / 2;
-                        Print(line, 1, cursorPos);
-                        Thread.Sleep(speed);
-                    }
-                    else
-                    {
-                        int cursorPos = (Console.WindowWidth - line.Length) / 2;
-                        Print(line, 1, cursorPos);
-                    }
+                    AudioPlaybackEngine.Instance.PlaySound(sound);
+                    int cursorPos = (Console.WindowWidth - line.Length) / 2;
+                    Print(line, 1, cursorPos);
+                    Thread.Sleep(speed);
+                }
+                else
+                {
+                    int cursorPos = (Console.WindowWidth - line.Length) / 2;
+                    Print(line, 1, cursorPos);
                 }
             }
         }
         else
         {
-            using (StringReader reader = new StringReader(art))
+            using StringReader reader = new StringReader(art);
+            string? line;
+            while ((line = reader.ReadLine()) != null)
             {
-                string? line;
-                while ((line = reader.ReadLine()) != null)
-                {
-                    Print(line);
-                }
+                Print(line);
             }
         }
     }
@@ -648,8 +644,17 @@ class Program
     }
     static void AddToInventory(string key, int value)
     {
-        if (inventory.ContainsKey(key)) { inventory[key] += value; }
-        else { inventory.Add(key, value); }
+        if (inventory.ContainsKey(key))
+        {
+            int newValue = inventory[key] + value;
+            if (newValue < 0) { inventory.Remove(key); return; }
+            inventory[key] = newValue;
+        }
+        else
+        {
+            if (value < 0) { return; }
+            inventory.Add(key, value);
+        }
     }
     static int ItemCount(string key)
     {
@@ -912,7 +917,7 @@ class Program
         if (luck < 20)
         {
             int sticks = rand.Next(2, 6);
-            Narrate($"You find {sticks} sticks.");
+            Narrate($"You find §(6){sticks} §(7)sticks.");
             AddToInventory("Sticks", sticks);
             AddCharisma(1);
         }
@@ -1101,7 +1106,6 @@ class Program
 
             Console.CursorVisible = true;
             Print($"You have {5 - choices} choice{(choices == 4 ? "" : "s")} remaining. ", 2, 0, 0);
-            DrawDigGame(map, xChoice, yChoice);
 
             int luck = rand.Next(0, 101);
             string item;
@@ -1120,7 +1124,7 @@ class Program
                 item = "§(6)sticks";
                 map[yChoice, xChoice] = 4;
                 AddToInventory("Sticks", int.Parse(count));
-                charisma = -1;
+                charisma = 1;
             }
             else if (luck < 90)
             {
@@ -1141,6 +1145,7 @@ class Program
 
             }
 
+            DrawDigGame(map, xChoice, yChoice);
             Print($"You found {count} {item}§(15)!", 1, 0, 8 + choices * 2);
             AddCharisma(charisma);
         }
@@ -2493,8 +2498,8 @@ class Program
         MainConsole.Clear();
 
         carl.Say("This is the end for you, you gutter-crawling cur!");
-        weapons = ConvertStringArray(inventory.Keys.ToArray());
         DrawHealth();
+        weapons = ConvertStringArray(inventory.Keys.ToArray());
         while (carlHealth > 1 && playerHealth > 1 && !surrendered)
         {
             if (playerDistracted)
@@ -2505,6 +2510,7 @@ class Program
             else
             {
                 PlayerAttack();
+                weapons = ConvertStringArray(inventory.Keys.ToArray()); // update weapons as they may have used up an item
             }
 
             if (carlHealth < 1 || playerHealth < 1 || surrendered) { break; }
@@ -2559,6 +2565,7 @@ class Program
             {
                 case -1: MainMenu(); madeMove = false; break;
                 case 0:
+                    if (weapons.Length == 0) { Narrate("You have no items left to attack with! Try an insult."); break; }
                     choice = Choose(weapons, drawHealth: true);
                     if (choice == -1) { madeMove = false; break; } // escape
 
@@ -2568,36 +2575,42 @@ class Program
                             Narrate("You hurl a handful of gold coins at Carl.", sleep: 55);
                             carl.Say("Ouch!");
                             AddToHealth("carl", -15);
+                            AddToInventory("Gold", -5);
                             break;
                         case "Sticks":
                             Narrate("You toss the stick at Carl.", sleep: 55);
                             carl.Say("Nice throw.");
                             AddToHealth("carl", -8);
+                            AddToInventory("Sticks", -1);
                             break;
                         case "Coconuts":
                             Narrate("You lob a coconut at Carl.", sleep: 55);
                             carl.Say("ARGH!");
                             Narrate("§(12)CRITICAL HIT!", sleep: 55);
-                            AddToHealth("carl", -10);
+                            AddToHealth("carl", -30);
+                            AddToInventory("Coconuts", -1);
                             break;
                         case "Used TP":
                             AudioPlaybackEngine.Instance.PauseLoopingMusic();
                             Narrate("You apply the used toilet paper to Carl."); carl.Voice = new CachedSound(@"Sounds\VoiceDave.wav");
                             carl.Say("...", sleep: 150); carl.Voice = null;
                             Narrate("§(12)CRITICAL HIT!", sleep: 30);
-                            AddToHealth("carl", -50);
+                            AddToHealth("carl", -99);
+                            AddToInventory("Used TP", -1);
                             AudioPlaybackEngine.Instance.ResumeLoopingMusic(); break;
                         case "Diamonds":
                             Narrate("You propel a priceless diamond at Carl.", sleep: 55);
                             carl.Say("Thanks!");
-                            AddCharisma(-20);
-                            AddToHealth("carl", 20);
+                            AddCharisma(-15);
+                            AddToHealth("carl", 15);
+                            AddToInventory("Diamonds", -1);
                             break;
 
                     }
                     break;
 
                 case 1:
+                    if (weapons.Length == 0) { Narrate("You have no items left to use! Try an insult."); break; }
                     choice = Choose(weapons, drawHealth: true);
                     if (choice == -1) { madeMove = false; break; } // escape
 
@@ -2607,15 +2620,19 @@ class Program
                             Narrate("You... Eat the gold?", sleep: 55);
                             Player.Say("Ouch!");
                             AddToHealth("player", -10);
+                            AddToInventory("Gold", -5);
                             break;
                         case "Sticks":
                             Narrate("You arrange the sticks into a pretty pattern.", sleep: 55);
                             Narrate("§(10)Carl is distracted for 1 round!", sleep: 55);
-                            carlDistracted = true; break;
+                            carlDistracted = true;
+                            AddToInventory("Sticks", -1);
+                            break;
                         case "Coconuts":
                             Narrate("You eat the coconut.", sleep: 55);
                             Player.Say("Mmm! Delicious!");
                             AddToHealth("player", 30);
+                            AddToInventory("Coconuts", -1);
                             break;
                         case "Used TP":
                             AudioPlaybackEngine.Instance.PauseLoopingMusic();
@@ -2623,11 +2640,13 @@ class Program
                             carl.Say("...", sleep: 150); carl.Voice = null;
                             Narrate("Carl is disgusted.");
                             Narrate("§(10)Carl is distracted for 1 round!", sleep: 55);
+                            AddToInventory("Used TP", -1);
                             carlDistracted = true;
                             AudioPlaybackEngine.Instance.ResumeLoopingMusic(); break;
                         case "Diamonds":
                             Narrate("You stare at the diamond, amazed by it's reflectivity.", sleep: 55);
                             Narrate("§(12)You are distracted for 1 round!", sleep: 55);
+                            AddToInventory("Diamonds", -1);
                             playerDistracted = true; break;
                     }
                     break;
@@ -2801,8 +2820,8 @@ class Program
             }
             catch (WonGameException e)
             {
-                ResultsScreen(route);
                 route = e.Route;
+                ResultsScreen(route);
             }
             catch (ExitGameException)
             {
