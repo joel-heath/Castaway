@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="960" alt="Castaway logo" src="Castaway/logo.svg">
+  <img width="849" alt="Castaway logo" src="Castaway/logo.svg">
 </p>
 
 # Castaway
