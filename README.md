@@ -5,7 +5,7 @@
 # Castaway
 Survive being cast away on desert island!
 
-[Castaway](castaway.joelheath.net) is an interactive terminal-based adventure game, with 1000+ different routes to go through!*
+[Castaway](https://castaway.joelheath.net) is an interactive terminal-based adventure game, with 1000+ different routes to go through!*
 
 *_Rounded up to the nearest thousand._
 
