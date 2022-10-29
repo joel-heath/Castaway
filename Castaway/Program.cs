@@ -335,6 +335,22 @@ class Program
 
         return output;
     }
+    static int ReadInt(int xCoord = -1, int yCoord = -1)
+    {
+        while (true)
+        {
+            Print("§(14)> ", newLines: 0, x: xCoord, y: yCoord);
+            string uInput = ReadChars();
+            if (int.TryParse(uInput, out int result))
+            {
+                return result;
+            }
+            else
+            {
+                MainConsole.Refresh();
+            }
+        }
+    }
     static string ReadStr(int xCoord = -1, int yCoord = -1, int maxLength = -1, bool pointer = false)
     {
         int xInit, yInit;
@@ -713,6 +729,7 @@ class Program
         }
         Print("", 1);
         Print("§(8)Press any key to continue.");
+        ClearKeyBuffer();
         Console.ReadKey();
 
         MainConsole.Clear();
@@ -728,6 +745,7 @@ class Program
 
         Print("", 1);
         Print("§(8)Press any key to continue.");
+        ClearKeyBuffer();
         Console.ReadKey();
 
         MainConsole.Clear();
@@ -862,38 +880,18 @@ class Program
         int route = -1;
         int loops = 0;
 
-        while (route == -1)
+        while (loops < 3)
         {
-            if (loops > 2)
-            {
-                int chanceOfRandomEvent = rand.Next(0, 101);
-                if (chanceOfRandomEvent < 20)
-                {
-                    Narrate("You see something coming over the horizon...");
-                    return 2; // monkey route
-                }
-                else if (chanceOfRandomEvent < 40)
-                {
-                    Narrate("You see something coming over the horizon...");
-                    return 3; // pirate route
-                }
-                // else continue
-            }
             Player.Say("What in the world should I do now?", 2);
 
             ClearKeyBuffer();
-            if (inventory.ContainsKey("Diamonds") && loops > 2)
-            {
-                choices[2] = new ConsoleMessage("Shout 'I have a diamond'", ConsoleColor.Magenta);
-                knowledge.Add("Can do town route");
-            }
             int choice = Choose(choices);
             switch (choice)
             {
                 case -1: MainMenu(); break;
                 case 0: Forage(); break;
                 case 1: DigGame(); break;
-                case 2: route = Shout(knowledge.Contains("Can do town route")); break;
+                case 2: Shout(); break;
                 case 3:
                     Narrate("You lay down and try to sleep.");
                     Narrate("You can't. It's midday.");
@@ -903,6 +901,14 @@ class Program
             }
             loops++;
         }
+
+        Narrate("It's becoming night.");
+        Player.Say("Oh gee golly gosh it sure is getting dark!");
+        Player.Say("I'm gonna have to choose what to do...");
+        choices = Build("Stay at island bay", "Venture into the jungle");
+        // if they've found a diamond they gain access to the diamond / town route
+        choices = choices.Append(new ConsoleMessage("Shout 'I have a diamond'", ConsoleColor.Magenta)).ToArray();
+        route = Choose(choices);
 
         return route;
     }
@@ -914,21 +920,21 @@ class Program
         AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\Discovery.wav"), true);
         AudioPlaybackEngine.Instance.ResumeLoopingMusic();
 
-        if (luck < 20)
+        if (luck < 10)
         {
             int sticks = rand.Next(2, 6);
             Narrate($"You find §(6){sticks} §(7)sticks.");
             AddToInventory("Sticks", sticks);
             AddCharisma(1);
         }
-        else if (luck < 50)
+        else if (luck < 40)
         {
             int coconuts = rand.Next(1, 4);
             Narrate($"You found {coconuts} coconut{(coconuts != 1 ? "s" : "")}!");
             AddToInventory("Coconuts", coconuts);
             AddCharisma(10);
         }
-        else if (luck < 80)
+        else if (luck < 65)
         {
             if (stats[0] < 20)
             {
@@ -942,71 +948,59 @@ class Program
                 AddCharisma(-10);
             }
         }
-        else
+        else if (luck < 85)
         {
             int gold = rand.Next(10, 50);
             Narrate($"You found {gold} gold!");
             AddToInventory("Gold", gold);
             AddCharisma(20);
         }
-    }
-    static int Shout(bool diamonds)
-    {
-        if (!diamonds)
+        else
         {
-            Person dave = new Person("Dave", ConsoleColor.DarkCyan, null);
-            Person greg = new Person("Greg", ConsoleColor.Green, null);
-            Player.Say("Help me!");
-            Thread.Sleep(1000);
-            int chance = rand.Next(1, 101);
-            if (chance < 70)
+            // 15% chance they get randomly sent on a random route:
+            switch (rand.Next(0, 3))
             {
-                Narrate("No-one responds.");
-                AddCharisma(-10);
+                case 0: Narrate("You found a diamond!"); Route1(); break;
+                case 1: Route2(); break;
+                case 2: Route3(); break;
             }
-            else if (chance < 99)
-            {
-                dave.Say("What in the world are you still doing here?");
-                Player.Say("Dave, you came back!");
-                dave.Say("And I'll leave as soon as I came.");
-                Player.Say("Wait! Please help me out! I'm in dire need of your assistance!");
-                dave.Say("Ugh okay, here's a §(9)diamond§(3).");
-                Narrate("§(13)Maybe someone will be interested in this...");
-                RestoreCharisma();
-                Player.Say("See you later Dave!");
-                Narrate("Dave disappears round a corner.");
-                Player.Say("I probably should've followed him...");
-                AddCharisma(-5);
-            }
-            else
-            {
-                greg.Say($"Ugh what is it now, {Player.Name}.");
-                Player.Say("Please help me get off this island, Greg!");
-                greg.Say("Ugh, fine. Get on the boat");
-                Narrate("Greg takes you back home.");
-                Thread.Sleep(1000);
-                throw new WonGameException(0);
-            }
+        }
+    }
+    static void Shout()
+    {
+        Person dave = new Person("Dave", ConsoleColor.DarkCyan, null);
+        Person greg = new Person("Greg", ConsoleColor.Green, null);
+        Player.Say("Help me!");
+        Thread.Sleep(1000);
+        int chance = rand.Next(1, 101);
+        if (chance < 70)
+        {
+            Narrate("No-one responds.");
+            AddCharisma(-10);
+        }
+        else if (chance < 99)
+        {
+            dave.Say("What in the world are you still doing here?");
+            Player.Say("Dave, you came back!");
+            dave.Say("And I'll leave as soon as I came.");
+            Player.Say("Wait! Please help me out! I'm in dire need of your assistance!");
+            dave.Say("Ugh okay, here's a §(9)diamond§(3).");
+            Narrate("§(13)Maybe someone will be interested in this...");
+            RestoreCharisma();
+            Player.Say("See you later Dave!");
+            Narrate("Dave disappears round a corner.");
+            Player.Say("I probably should've followed him...");
+            AddCharisma(-5);
         }
         else
         {
-            Person chanelle = new Person("Chanelle", ConsoleColor.DarkMagenta, null);
-            Person addison = new Person("Addison", ConsoleColor.DarkBlue, null);
-            Person shaniece = new Person("Shaniece", ConsoleColor.DarkGreen, null);
-            Person mackenzie = new Person("Mackenzie", ConsoleColor.DarkRed, null);
-
-            Player.Say("I have §(9)diamonds§(11)!");
+            greg.Say($"Ugh what is it now, {Player.Name}.");
+            Player.Say("Please help me get off this island, Greg!");
+            greg.Say("Ugh, fine. Get on the boat");
+            Narrate("Greg takes you back home.");
             Thread.Sleep(1000);
-            Narrate("The paparazzi appear, asking for your diamonds.");
-            chanelle.Say("OMGOODNESS you have §(9)DIAMONDS§(5)!?");
-            addison.Say($"WOW, {Player.Name.ToUpper()}, I LOVE YOU SO MUCH!");
-            shaniece.Say($"You don't mind sharing do you?");
-            mackenzie.Say($"Follow us, we'll give you whatever you want for your diamonds!");
-            Narrate("The ladies take you to their village");
-            Thread.Sleep(1000);
-            return 1; // route 1 'diamond route'
+            throw new WonGameException(0);
         }
-        return -1; // carry on no route
     }
     static void DrawDigGame(int[,] map, int x, int y)
     {
@@ -1163,22 +1157,37 @@ class Program
 
     /// CHAPTER 2
 
-    /// Diamond route
+    /// Diamond route : Go home route
     static void Route1()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
-        ClearKeyBuffer();
-        MainConsole.Clear();
-
         Person chanelle = new Person("Chanelle", ConsoleColor.DarkMagenta, null);
         Person addison = new Person("Addison", ConsoleColor.DarkBlue, null);
         Person shaniece = new Person("Shaniece", ConsoleColor.DarkGreen, null);
         Person mackenzie = new Person("Mackenzie", ConsoleColor.DarkRed, null);
+        
+        Player.Say("I have §(9)diamonds§(11)!");
+        Thread.Sleep(1000);
+        Narrate("The paparazzi appear, asking for your diamonds.");
+        chanelle.Say("OMGOODNESS you have §(9)DIAMONDS§(5)!?");
+        addison.Say($"WOW, {Player.Name.ToUpper()}, I LOVE YOU SO MUCH!");
+        shaniece.Say($"You don't mind sharing do you?");
+        mackenzie.Say($"Follow us, we'll give you whatever you want for your diamonds!");
+        Narrate("The ladies take you to their village");
+        Thread.Sleep(1000);
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
+        ClearKeyBuffer();
+        MainConsole.Clear();
 
         chanelle.Say($"Welcome to our village, {Player.Name}!");
         addison.Say("Have a look around!");
         shaniece.Say("Take a look at my hotel for a place to sleep at night.");
         mackenzie.Say("Check out my shop to spend that §(9)diamond §(4)of yours.");
+
+        Player.Say("Hmm, so I can either start out a new life here, or I can get a boat and try to go home.");
+        if (Choose(Build("Go home", "Live here")) == 1)
+        {
+            LiveInVillage(); // otherwise stay on this route
+        }
 
         ConsoleMessage[] options = Build("Mackenzie's Shop", "Shaniece's Hotel", "View stats", "Search Further East");
         bool skipRamble = false; // cleans the transition to the east side
@@ -1190,7 +1199,7 @@ class Program
             switch (Choose(options))
             {
                 case -1: MainMenu(); break;
-                case 0: Shop(); break;
+                case 0: Shop(false); break;
                 case 1: Hotel(); break;
                 case 2: ViewStats(); ViewInventory(); break;
                 case 3:
@@ -1218,10 +1227,13 @@ class Program
 
         MainConsole.Clear();
 
-        SailBoat();
-        OtherIsland();
-
-        throw new WonGameException(1);
+        Narrate("You have one more choice to make.");
+        Player.Say("Now how should I use this boat and map?");
+        switch(Choose(Build("Search for treasure", "Sail home"), false))
+        {
+            case 0: SailBoatHome(); break;
+            case 1: SearchForTreasure(); break;
+        }
     }
     static bool EastSide()
     {
@@ -1389,7 +1401,7 @@ class Program
     static Tuple<ConsoleMessage, int>[][] shop = BuildShelves(NewShelf(NewItem("Bunch o' bananas", 5), NewItem("Teddy bear", 10), NewItem("Shovel", 20)),
                                                              NewShelf(NewItem("Roblox gift card", 100), NewItem("Paper", 3), NewItem("Rope", 5)),
                                                              NewShelf(NewItem("Diamond", 999), NewItem("Pencil", 3), NewItem("Sticks", 1)));
-    static void Shop()
+    static void Shop(bool villageRoute)
     {
         MainConsole.Clear();
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Local Forecast.mp3");
@@ -1397,30 +1409,32 @@ class Program
         Person mackenzie = new Person("Mackenzie", ConsoleColor.DarkRed, null);
 
         mackenzie.Say($"Hey, {Player.Name}, welcome to my shop!");
-        if (!knowledge.Contains("Spoken with shopkeeper"))
+        if (!villageRoute)
         {
-            Player.Say($"I have §(14){inventory["Gold"]} gold§(11).");
-            mackenzie.Say("And what about that §(9)diamond§(4)?");
-            if (knowledge.Contains("Scammed"))
+            if (!knowledge.Contains("Spoken with shopkeeper"))
             {
-                Player.Say("Chanelle took it from me!");
-                Player.Say("She said she'd give me a boat in return and then kicked me out!");
-                mackenzie.Say("Oh you can't trust that Chanelle.");
-                mackenzie.Say("If you're looking to get off this island, you'll be needing §(13)supplies §(4)from me!");
+                Player.Say($"I have §(14){inventory["Gold"]} gold§(11).");
+                mackenzie.Say("And what about that §(9)diamond§(4)?");
+                if (knowledge.Contains("Scammed"))
+                {
+                    Player.Say("Chanelle took it from me!");
+                    Player.Say("She said she'd give me a boat in return and then kicked me out!");
+                    mackenzie.Say("Oh you can't trust that Chanelle.");
+                    mackenzie.Say("If you're looking to get off this island, you'll be needing §(13)supplies §(4)from me!");
+                }
+                else
+                {
+                    Player.Say("Oh yeah, I have that too.");
+                    mackenzie.Say("Well what are you looking for?");
+                    Player.Say("Is there any way to get off this island quickly?");
+                    mackenzie.Say("Oh yes, for sure. All you'll need is a §(13)boat§(4), a §(13)map§(4), and you can get §(13)supplies §(4)from me!");
+                }
             }
             else
             {
-                Player.Say("Oh yeah, I have that too.");
-                mackenzie.Say("Well what are you looking for?");
-                Player.Say("Is there any way to get off this island quickly?");
-                mackenzie.Say("Oh yes, for sure. All you'll need is a §(13)boat§(4), a §(13)map§(4), and you can get §(13)supplies §(4)from me!");
+                mackenzie.Say("You'll need a §(13)boat§(4), a §(13)map§(4), and you can get §(13)supplies §(4)from me!");
             }
         }
-        else
-        {
-            mackenzie.Say("You'll need a §(13)boat§(4), a §(13)map§(4), and you can get §(13)supplies §(4)from me!");
-        }
-
 
         (int shelfI, int itemI) = ShopMenu(shop);
         string item = shop[shelfI][itemI].Item1.Contents;
@@ -1602,7 +1616,9 @@ class Program
                 case 0:
                     Narrate("You go to bed.");
                     Narrate("Getting a good nights sleep helps you feel better");
-                    RestoreCharisma(); break;
+                    RestoreCharisma();
+                    knowledge.Add("Been to bed");
+                    break;
             }
         }
 
@@ -1610,7 +1626,7 @@ class Program
         MainConsole.Clear();
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
     }
-    static void SailBoat()
+    static void SailBoatHome()
     {
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Salty Ditty.mp3");
 
@@ -1644,15 +1660,37 @@ class Program
         {
             knowledge.Add("Failed map");
             Player.Say("Well it doesn't really look like I've gone the right way...");
-            Player.Say("But there is a massive plot of land to my left...");
-            Player.Say("It's probably that way.");
-        }
-        else
-        {
-            Player.Say("Huzzah! I have bested the map!");
-            Player.Say("I see land right in front of me.");
-        }
+            Narrate("All of a sudden, you hear a perculiar sound...");
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\CartoonBoing.wav"), true);
+            Thread.Sleep(500);
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Thinking Music.mp3");
+            Player.Say("What in the world could that be?");
+            Narrate("You feel yourself descending.");
+            Player.Say("Hmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm...");
+            Player.Say("OH WAIT I'M SINKING!", sleep: 30);
+            Thread.Sleep(350);
+            AudioPlaybackEngine.Instance.StopLoopingMusic();
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\GameOver.wav"), true);
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Oppressive Gloom.mp3");
+            CenterText(Build("Game Over"));
 
+            throw new NewGameException();
+
+        }
+        
+        Player.Say("Huzzah! I have bested the map!");
+        Player.Say("There it is—Great Britian.");
+        Player.Say("They sure were right in calling it great");
+        Narrate("You found your way home");
+        Narrate("The end...", sleep:300);
+        throw new WonGameException(1);
+    }
+    static void SearchForTreasure()
+    {
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Salty Ditty.mp3");
+
+        Player.Say("So the map seems to say I go this way!");
+        Player.Say("Treasure of the seas, here I come!");
         Narrate("All of a sudden, you hear a perculiar sound...");
         AudioPlaybackEngine.Instance.StopLoopingMusic();
         AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\CartoonBoing.wav"), true);
@@ -1664,6 +1702,7 @@ class Program
         Player.Say("OH WAIT I'M SINKING!", sleep: 30);
 
         SinkingShip();
+        OtherIsland();
     }
     static void SinkingShip()
     {
@@ -1820,10 +1859,227 @@ class Program
 
         Narrate("The end.", sleep: 300);
         Thread.Sleep(1000);
+        throw new WonGameException(1);
+    }
+
+    /// Live in town route
+    static void LiveInVillage()
+    {
+        AddToInventory("Gold", 50);
+        Narrate("The council kindly give you 50 gold to help you begin your endeavours in the village.");
+        int initGold = ItemCount("Gold");
+        ConsoleMessage[] options = Build("Mackenzie's Shop", "Shaniece's Hotel", "View chores", "Search Further North");
+        List<string> chores = new() { "Buy groceries", "Go to bed", "Restore charisma", "Pay taxes" };
+        bool skipRamble = false; // cleans the transition to the east side
+        bool finished = false;
+        while (!finished)
+        {
+            if (!skipRamble) { Player.Say("What do I do now?"); }
+            skipRamble = false;
+            switch (Choose(options))
+            {
+                case -1: MainMenu(); break;
+                case 0: Shop(true); if (ItemCount("Bunch o' bananas") > 0) { chores.Remove("Buy groceries"); } break;
+                case 1: Hotel(); if (knowledge.Contains("Been to bed")) { chores.Remove("Go to bed"); } break;
+                case 2: ViewChores(chores); break;
+                case 3: ViewStats(); ViewInventory(); break;
+            }
+            if (!skipRamble) { MainConsole.Clear(); }
+            if (stats[1] == 100) { chores.Remove("Restore charisma"); }
+            if (chores.Count == 1) { finished = true; }
+        }
+
+        Player.Say("Finally, I've done everything I need to do to become a normal citizen here!");
+        Player.Say("Now I need to pay my taxes.");
+        if (Choose(Build("Pay taxes", "Don't pay taxes")) == 1) { TaxEvasion(); } // will run into a win game or loose game so no else needed
+        // pay taxes route
+        MainConsole.Clear();
+        int currentGold = ItemCount("Gold");
+        int goldSpent = initGold - currentGold;
+
+        Player.Say($"So I started with {goldSpent} gold.");
+        Player.Say($"And now I have {currentGold} gold.");
+        Player.Say("How much gold have I spent? ");
+        int guess = ReadInt();
+        if (guess != goldSpent) // ok I KNOW this is incredibly repetetive code but leave me be I have 1000 more routes to add
+        {
+            Player.Say($"It's, err- I think it's about {guess}?");
+            Thread.Sleep(500);
+            CenterText(Build("Days pass..."), time: 2000, audioLocation: @"Sounds\DaysPass.wav"); MainConsole.Clear();
+            Narrate($"It was not {guess}. The council were not impressed with your inability to subtract.");
+            Thread.Sleep(500);
+            AudioPlaybackEngine.Instance.StopLoopingMusic();
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\GameOver.wav"), true);
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Oppressive Gloom.mp3");
+            CenterText(Build("Game Over"));
+
+            throw new NewGameException();    
+        }
+
+        Player.Say("Now I need 17.5% of that (I'll round it down to the nearest integer no-one'll know)");
+        guess = ReadInt();
+        int tax = (int)(goldSpent * 175 / 1000);
+
+        if (guess != tax)
+        {
+            Player.Say($"It's, err- I think it's about {guess}?");
+            Thread.Sleep(500);
+            CenterText(Build("Days pass..."), time: 2000, audioLocation: @"Sounds\DaysPass.wav"); MainConsole.Clear();
+            Narrate($"It was not {guess}. The council were not impressed with your inability to multiply percentages.");
+            Thread.Sleep(500);
+            AudioPlaybackEngine.Instance.StopLoopingMusic();
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\GameOver.wav"), true);
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Oppressive Gloom.mp3");
+            CenterText(Build("Game Over"));
+
+            throw new NewGameException();
+        }
+
+        Player.Say("Now whats my current balance minus the tax?");
+        guess = ReadInt();
+
+        if (guess != currentGold - tax)
+        {
+            Player.Say($"It's, err- I think it's about {guess}?");
+            Thread.Sleep(500);
+            CenterText(Build("Days pass..."), time: 2000, audioLocation: @"Sounds\DaysPass.wav"); MainConsole.Clear();
+            Narrate($"It was not {guess}. The council were not impressed with your inability to subtract.");
+            Thread.Sleep(500);
+            AudioPlaybackEngine.Instance.StopLoopingMusic();
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\GameOver.wav"), true);
+            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Oppressive Gloom.mp3");
+            CenterText(Build("Game Over"));
+
+            throw new NewGameException();
+        }
+
+        Player.Say("Huzzah! I have deduced my tax. Yipee!");
+        Thread.Sleep(500);
+        throw new WonGameException(1);
+    }
+    static void ViewChores(List<string> chores)
+    {
+        MainConsole.Clear();
+        Print("Current chores", 2);
+        for(int i = 0; i < chores.Count; i++)
+        {
+            Print($"{i + 1}. {chores[i]}");
+        }
+        Print("");
+        Print("§(8)Press any key to continue.");
+        Console.ReadKey();
+    }
+    static void TaxEvasion()
+    {
+        MainConsole.Clear();
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captain Trillian.mp3");
+
+        Player.Say("AHHH!");
+        Narrate("You begin running. Watch out for giant rocks to jump over.");
+        Thread.Sleep(3000);
+        QuickJump(1000);
+        Player.Say("Phew, I made i-");
+        QuickJump(600);
+        Player.Say("Golly-gee gosh great goodness! That sure was close.");
+        Thread.Sleep(2420);
+        QuickJump(400); // 400 ms F's in the chat if they dont get it
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Boogie Party.mp3");
+        ClearKeyBuffer();
+        Narrate("You did it! In the nick of time aswell!");
+        Narrate("You continued to run for the rest of all eternity.");
+        Narrate("You were never caught. Not ever.");
+        Narrate("The end", sleep: 300);
+        knowledge.Add("Evaded taxes");
+        throw new WonGameException(1);
+    }
+    static void QuickJump(int time)
+    {
+        ClearKeyBuffer();
+        Print("§(12)GIANT ROCK! JUMP WITH [SPACE]!");
+        Thread.Sleep(time);
+        if (!Console.KeyAvailable)
+        {
+            ClearKeyBuffer();
+            MainConsole.Clear();
+            AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\Crash.mp3"), true);
+            AudioPlaybackEngine.Instance.ResumeLoopingMusic();
+            CenterText(new ConsoleMessage[] { "You died..." });
+            throw new NewGameException();
+        }
     }
 
 
+
     /// Monkey route
+    static void Route2()
+    {
+        Narrate("As you wander, you see something coming over the horizon...");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Jaunty Gumption.mp3");
+
+        Person craig = new Person("Craig The Monkey", ConsoleColor.DarkGreen, null);
+        Person walt = new Person("Walt The Monkey", ConsoleColor.DarkBlue, null);
+
+        Narrate("A group of monkeys approaches!");
+        Narrate("They challenge you to a race across the island.");
+        Narrate("Do you accept?");
+        if (Choose(Build("Yes, race the monkeys", "No, I have better things to do")) == 1)
+        {
+            MainConsole.Clear();
+            Narrate("The monkeys inch closer towards you.");
+            Narrate("You feel an unsettling atmosphere surround you.");
+            Narrate("Do you accept?");
+            if (Choose(Build("Yes, race the monkeys", "No, not right now")) == 1)
+            {
+                MainConsole.Clear();
+                Narrate("The monkeys inch closer still.");
+                Narrate("Do you accept?");
+                if (Choose(Build("Yes, race the monkeys", "No, the monkeys can play with each other")) == 1)
+                {
+                    MainConsole.Clear();
+                    Narrate("The monkeys give you one last chance to accept.");
+                    Narrate("Do you accept?");
+                    if (Choose(Build("Yes, race the monkeys", "No, ignore their warnings")) == 1)
+                    {
+                        AudioPlaybackEngine.Instance.StopLoopingMusic();
+                        MainConsole.Clear();
+                        craig.Say("Ooo-oo Aa-aa. (The human refuses to play.)");
+                        walt.Say("Eee-ee Aaa-aa. (The human must battle our king.)");
+                        Player.Say("Wait-wha");
+                        AudioPlaybackEngine.Instance.StopLoopingMusic();
+                        MainConsole.Clear();
+                        MonkeyBattle();
+                    }
+                }
+            }
+        }
+
+        MonkeyRace();
+        MainConsole.Clear();
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Winner Winner.mp3");
+
+        craig.Say("Ooo-oo Aa-aa! (The human beat us!)");
+        walt.Say("Aaa-aa Eee-ee! (The human must be our new king!)");
+        craig.Say("Eee-ee Aa-aa! (We shall take the new king home!)");
+        walt.Say("Aaa-aa Ooo-oo! (The human will battle for the throne!)");
+
+        Player.Say("Wait-wait-wait-wait.");
+
+        if (Choose(Build("Battle for the monkey throne?", "No... maybe later.")) == 1)
+        {
+            AudioPlaybackEngine.Instance.StopLoopingMusic();
+            MainConsole.Clear();
+            MonkeyBattle();
+        }
+
+        craig.Say("Eee-eee Oo-ooo! (Fine, human will play with us!)");
+        MonkeyRace();
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Winner Winner.mp3");
+        walt.Say("Ooo-oo Aaa-aaa! (Thank you for playing with us!)");
+        craig.Say("Aaa-aa Ee-eee! (We will go home now!)");
+        Narrate("The end", sleep: 500);
+        Thread.Sleep(1000);
+        throw new WonGameException(2);
+    }
     static void UpdateMap(int[,] map, int playerDestination, int m1destination, int m2destination)
     {
         if (playerDestination != 16) // Don't update previous position if previous is out of bounds
@@ -2046,70 +2302,41 @@ class Program
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Boogie Party.mp3");
         ClearKeyBuffer();
         Narrate("In the nick of time you grabbed a ledge while you fell!");
-        Narrate("The monkeys, amazed by your skill, promote you to their new leader.");
+        
+        if (Choose(Build("Escape volcano", "Stay in volcano")) == 0)
+        {
+            MonkeyChase();
+        }
+
+        Narrate("The monkeys, amazed by your skill, save you and promote you to their new leader.");
         Narrate("They overthrow the old king, who now eats bananas in a cave.");
         Narrate("You, however, went on to lead the monkeys to an unstoppable empire.");
         Narrate("As for all the other monkeys, they loved their new king.");
         Narrate("The end.", sleep: 300);
         throw new WonGameException(2);
     }
-    static void Route2()
+    static void MonkeyChase()
     {
-        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Jaunty Gumption.mp3");
-
-        Person craig = new Person("Craig The Monkey", ConsoleColor.DarkGreen, null);
-        Person walt = new Person("Walt The Monkey", ConsoleColor.DarkBlue, null);
-
-        bool playGame = true;
-        Narrate("A group of monkeys approaches!");
-        Narrate("They challenge you to a race across the island.");
-        Narrate("Do you accept?");
-        if (Choose(Build("Yes, race the monkeys", "No, I have better things to do")) == 1)
-        {
-            MainConsole.Clear();
-            Narrate("The monkeys inch closer towards you.");
-            Narrate("You feel an unsettling atmosphere surround you.");
-            Narrate("Do you accept?");
-            if (Choose(Build("Yes, race the monkeys", "No, not right now")) == 1)
-            {
-                MainConsole.Clear();
-                Narrate("The monkeys inch closer still.");
-                Narrate("Do you accept?");
-                if (Choose(Build("Yes, race the monkeys", "No, the monkeys can play with each other")) == 1)
-                {
-                    MainConsole.Clear();
-                    Narrate("The monkeys give you one last chance to accept.");
-                    Narrate("Do you accept?");
-                    if (Choose(Build("Yes, race the monkeys", "No, ignore their warnings")) == 1)
-                    {
-                        AudioPlaybackEngine.Instance.StopLoopingMusic();
-                        MainConsole.Clear();
-                        craig.Say("Ooo-oo Aa-aa. (The human refuses to play.)");
-                        walt.Say("Eee-ee Aaa-aa. (The human must battle our king.)");
-                        playGame = false;
-                    }
-                }
-            }
-        }
-
-        if (playGame)
-        {
-            MonkeyRace();
-            MainConsole.Clear();
-            AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Winner Winner.mp3");
-
-            craig.Say("Ooo-oo Aa-aa! (The human beat us!)");
-            walt.Say("Aaa-aa Eee-ee! (The human must be our new king!)");
-            craig.Say("Eee-ee Aa-aa! (We shall take the new king home!)");
-            walt.Say("Aaa-aa Ooo-oo! (The human will battle for the throne!)");
-        }
-
-        Player.Say("Wait-wha");
-        AudioPlaybackEngine.Instance.StopLoopingMusic();
         MainConsole.Clear();
-        MonkeyBattle();
-    }
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captain Trillian.mp3");
 
+        Player.Say("AHHH!");
+        Narrate("You begin running from the hoard of monkeys. Watch out for giant rocks to jump over.");
+        Thread.Sleep(3000);
+        QuickJump(1000);
+        Player.Say("Phew, I made i-");
+        QuickJump(600);
+        Player.Say("Golly-gee gosh great goodness! That sure was close.");
+        Thread.Sleep(2420);
+        QuickJump(400); // 400 ms F's in the chat if they dont get it
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Boogie Party.mp3");
+        ClearKeyBuffer();
+        Narrate("You did it! In the nick of time aswell!");
+        Narrate("You continued to run for the rest of all eternity.");
+        Narrate("You were never caught. Not ever.");
+        Narrate("The end", sleep: 300);
+        throw new WonGameException(2);
+    }
 
     /// Pirate Route
     static void Route3Prologue()
@@ -2151,12 +2378,20 @@ class Program
     }
     static void Route3()
     {
+        MainConsole.Clear();
+        Narrate("You see something coming over the horizon...");
         Route3Prologue();
         Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
         Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
 
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Captain Scurvy.mp3");
         captain.Say("SCRUB THE DECK!");
+
+        if (Choose(Build("Scrub the deck", "No, fight the pirates")) == 1)
+        {
+            PirateBattle();
+        }
+
         ScrubTheDeck();
         Console.SetCursorPosition(0, 1);
         captain.Say("Shiver me timbers!");
@@ -2165,6 +2400,13 @@ class Program
         Thread.Sleep(1000);
 
         captain.Say("NOW CLIMB THE RIGGING!");
+        Narrate("That was a bit mean.");
+
+        if (Choose(Build("Climb the rigging", "No, fight the pirates")) == 1)
+        {
+            PirateBattle();
+        }
+
         ClimbTheRigging();
 
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Modern Jazz Samba.mp3");
@@ -2172,44 +2414,9 @@ class Program
 
         captain.Say("Arggg, ye beat me fellow pirateers!");
         Player.Say("Blimey! Me lily-livered, bilge-sucking hearties are soon-to-be shark bait!");
-        captain.Say($"Avast ye, crew! {Player.Name} reckons he can plunder all ye booties!");
-        Player.Say("I didn't say that!");
-        captain.Say("Well it be what I heard!");
-        carl.Say("I'll fight 'em Cap'n!");
-        captain.Say($"Well so it be! {carl.Name} shall battle {Player.Name}!");
-        Player.Say("Oh no");
-
-        if (PirateBattle())
-        {
-            MainConsole.Clear();
-            captain.Say($"Ay, {Player.Name} ye truly were the stronger pirate.");
-            Player.Say("ARG! I KNEW IT FROM THE START!");
-            Narrate("You begin an unstoppable pirating career, collecting booty and tracking down treasure.");
-            Narrate("Soon Captain Blackbeard retires and now resides in a care home.");
-            Narrate("You, however, continued your pirating to your very last breath.");
-            Narrate("The end.", sleep: 300);
-            Thread.Sleep(2000);
-            throw new WonGameException(3);
-        }
-        else
-        {
-            captain.Say("WALK THE PLANK YOU RAPSCALLION!");
-            carl.Say("Dead men tell no tales!");
-            Player.Say("Please! Don't make me do it!");
-            captain.Say("Any last words?");
-            Player.Say("");
-            ReadChars(10);
-            captain.Say("DONT REMEMBER ASKING!", sleep: 20);
-            Thread.Sleep(500);
-            Narrate("The captain shoves you onto the plank and forces you to walk.");
-            Narrate("You walk the plank.");
-            Narrate("You fall.");
-            Narrate("You survive.");
-            Narrate("With a minor major interior exterior concussion.");
-            AddCharisma(-50);
-            Thread.Sleep(500);
-            throw new NewGameException();
-        }
+        captain.Say($"Ye truly are the stronger pirate, {Player.Name}.");
+        Thread.Sleep(1000);
+        throw new WonGameException(3);
     }
     static void DrawDeck(int[,] map)
     {
@@ -2492,10 +2699,21 @@ class Program
     static readonly ConsoleMessage[] badInsults = Build("You're as blind as a bat!", "You're as ugly as an elephant.", "Everything you say is stupid!", "You probably can't even go cross-eyed!",
                                                         "You coward!", "You make me sick!", "I'd like my steak chicken-fried.", "I bet your wardrobe isn't even color-coordinated!");
     static Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
-    static bool PirateBattle()
+    static void PirateBattle()
     {
+        Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
+
+        captain.Say("Blimey! Me lily-livered, bilge-sucking hearty is soon-to-be shark bait!");
+        captain.Say($"Avast ye, crew! Who reckons he can plunder this scallywag's booty!");
+        Player.Say("Oh dear.");
+        carl.Say("I'll fight 'em Cap'n!");
+        captain.Say($"Well so it be! {carl.Name} shall battle {Player.Name}!");
+        Player.Say("Oh no");
+
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Bushwick Tarantella.mp3");
         MainConsole.Clear();
+
+        
 
         carl.Say("This is the end for you, you gutter-crawling cur!");
         DrawHealth();
@@ -2533,7 +2751,7 @@ class Program
             AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Man down.mp3");
             carl.Say("Ahargh! I knew ye were a meer picaroon! Scupper that scoundrel!");
             Thread.Sleep(1000);
-            return false;
+            WalkThePlank();
         }
         else if (playerHealth < 1)
         {
@@ -2541,7 +2759,7 @@ class Program
             Player.Say("By golly gosh you've made me toast!");
             carl.Say("I always knew you weren't a real pirate!");
             Thread.Sleep(1000);
-            return false;
+            WalkThePlank();
         }
         else
         {
@@ -2549,7 +2767,15 @@ class Program
             carl.Say("Aye, I've been bested. Me booty be the Captains.");
             Narrate("Carl yields.");
             Thread.Sleep(1000);
-            return true;
+            MainConsole.Clear();
+            captain.Say($"Ay, {Player.Name} ye truly were the stronger pirate.");
+            Player.Say("ARG! I KNEW IT FROM THE START!");
+            Narrate("You begin an unstoppable pirating career, collecting booty and tracking down treasure.");
+            Narrate("Soon Captain Blackbeard retires and now resides in a care home.");
+            Narrate("You, however, continued your pirating to your very last breath.");
+            Narrate("The end.", sleep: 300);
+            Thread.Sleep(2000);
+            throw new WonGameException(3);
         }
     }
     static void PlayerAttack()
@@ -2755,7 +2981,37 @@ class Program
             }
         }
     }
+    static void WalkThePlank()
+    {
+        Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
 
+        captain.Say("WALK THE PLANK YOU RAPSCALLION!");
+        carl.Say("Dead men tell no tales!");
+        Player.Say("Please! Don't make me do it!");
+        captain.Say("Any last words?");
+        Player.Say("");
+        ReadChars(10);
+        captain.Say("DONT REMEMBER ASKING!", sleep: 20);
+        Thread.Sleep(500);
+        Narrate("The captain shoves you onto the plank and forces you to walk.");
+        if (Choose(Build("Walk the plank", "No, I don't want to")) == 1)
+        {
+            Player.Say("Actually I have rights.");
+            Player.Say("Can I talk to your manager?");
+            captain.Say("Ay, maties, it's not worth it. ABANDON SHIP!");
+            Narrate("The crew abandons ship. You win.");
+            Thread.Sleep(500);
+            throw new WonGameException(3);
+        }
+        Narrate("You walk the plank.");
+        Narrate("You fall.");
+        Narrate("You survive.");
+        Narrate("With a minor major interior exterior concussion.");
+        AddCharisma(-50);
+        Thread.Sleep(500);
+        throw new NewGameException();
+    }
+    
 
     static void ResultsScreen(int route)
     {
@@ -2781,6 +3037,10 @@ class Program
                 if (knowledge.Contains("Failed map"))
                 {
                     Narrate("§(15)Times failed to read a map: 1");
+                }
+                if (knowledge.Contains("Evaded taxes"))
+                {
+                    Narrate("§(15)Taxes evaded: all of them");
                 }
                 Narrate("§(15)Boat leaks fixed: 1");
                 Narrate("§(15)Automotive warranties extended: 1");
