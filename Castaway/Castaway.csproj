@@ -3,10 +3,10 @@
   <PropertyGroup>
 	<OutputType>Exe</OutputType>
 	<TargetFramework>net6.0</TargetFramework>
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
-    <PublishReadyToRun>true</PublishReadyToRun>
+	<!--<PublishSingleFile>true</PublishSingleFile>-->
+	<SelfContained>true</SelfContained>
+	<RuntimeIdentifier>win-x86</RuntimeIdentifier>
+	<PublishReadyToRun>true</PublishReadyToRun>
 	<ImplicitUsings>enable</ImplicitUsings>
 	<Nullable>enable</Nullable>
 	<ApplicationIcon>icon.ico</ApplicationIcon>
@@ -116,7 +116,7 @@
 	<None Update="Music\Jaunty Gumption.mp3">
 	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	</None>
-	<None Update="Music\Adventures Of Captian Trillian.mp3">
+	<None Update="Music\Adventures Of Captain Trillian.mp3">
 	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	</None>
 	<None Update="Music\Thinking Music.mp3">

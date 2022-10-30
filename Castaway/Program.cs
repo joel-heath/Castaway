@@ -557,7 +557,7 @@ class Program
             Console.ReadKey(true);
         }
     }
-    static void DigArt(int artChoice, int speed = 0)
+    static void DigArt(int artChoice, int speed = 0, int yIndent = 0)
     {
         string art = string.Empty;
         bool center = false;
@@ -573,6 +573,83 @@ class Program
 ╚██████╗██║  ██║███████║   ██║   ██║  ██║╚███╔███╔╝██║  ██║   ██║   
  ╚═════╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝   
                                                                     "; break;
+            case 1: art = @"
+                                  )___(                       
+                           _______/__/_
+                  ___     /===========|   ___
+ ____       __   [\\\]___/____________|__[///]   __
+ \   \_____[\\]__/___________________________\__[//]___
+  \                                                    |
+   \                                                  /
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"; break;
+
+
+            case 2: art = @"
+              ,.  _~-.,               .                                 
+           ~'`_ \/,_. \_
+          / ,''_>@`,__`~.)             |           .
+          | |  @@@@'  '',! .           .          '
+          |/   ^^@     .!  \          |         /
+          `' .^^^     ,'    '         |        .             .
+           .^^^   .          \                /          .
+          .^^^       '  .     \       |      /       . '
+.,.,.     ^^^             ` .   .,+~'`^`'~+,.     , '
+&&&&&&,  ,^^^^.  . ._ ..__ _  .'             '. '_ __ ____ __ _ .. .  .
+%%%%%%%%%^^^^^^%%&&;_,.-=~'`^`'~=-.,__,.-=~'`^`'~=-.,__,.-=~'`^`'~=-., 
+&&&&&%%%%%%%%%%%%%%%%%%&&;,.-=~'`^`'~=-.,__,.-=~'`^`'~=-.,__,.-=~'`^`'~=
+%%%%%&&&&&&&&&&&%%%%&&&_,.;^`'~=-.,__,.-=~'`^`'~=-.,__,.-=~'`^`'~=-.,__,
+%%%%%%%%%&&&&&&&&&-=~'`^`'~=-.,__,.-=~'`^`'~=-.,__,.-==--^'~=-.,__,.-=~'
+##########*'''
+_,.-=~'`^`'~=-.,__,.-=~'`^`'~=-.,__,.-=~'`^`'~=-.,.-=~'`^`'~=-.,__,.-=~'
+
+~`'^`'~=-.,__,.-=~'`^`'~=-.,__,.-=~'`^`'~=-.,__,.-=~'`^`'~=-.,__,.-=~'`^"; break;
+
+            case 3: art = @"
+                                                           |>>>         
+                   _                      _                |
+    ____________ .' '.    _____/----/-\ .' './========\   / \
+   //// ////// /V_.-._\  |.-.-.|===| _ |-----| u    u |  /___\
+  // /// // ///==\ u |.  || | ||===||||| |T| |   ||   | .| u |_ _ _ _ _ 
+ ///////-\////====\==|:::::::::::::::::::::::::::::::::::|u u| U U U U U
+ |----/\u |--|++++|..|'''''''''''::::::::::::::''''''''''|+++|+-+-+-+-+-
+ |u u|u | |u ||||||..|              '::::::::'           |===|>=== _ _ =
+ |===|  |u|==|++++|==|              .::::::::.           | T |....| V |.
+ |u u|u | |u ||HH||         \|/    .::::::::::.
+ |===|_.|u|_.|+HH+|_              .::::::::::::.              _
+                __(_)___         .::::::::::::::.         ___(_)__
+---------------/  / \  /|       .:::::;;;:::;;:::.       |\  / \  \-----
+______________/_______/ |      .::::::;;:::::;;:::.      | \_______\____
+|       |     [===  =] /|     .:::::;;;::::::;;;:::.     |\ [==  = ]   |
+|_______|_____[ = == ]/ |    .:::::;;;:::::::;;;::::.    | \[ ===  ]___|
+     |       |[  === ] /|   .:::::;;;::::::::;;;:::::.   |\ [=  ===] |
+_____|_______|[== = =]/ |  .:::::;;;::::::::::;;;:::::.  | \[ ==  =]_|__
+ |       |    [ == = ] /| .::::::;;:::::::::::;;;::::::. |\ [== == ]    
+_|_______|____[=  == ]/ |.::::::;;:::::::::::::;;;::::::.| \[  === ]____
+   |       |  [ === =] /.::::::;;::::::::::::::;;;:::::::.\ [===  =]   |
+___|_______|__[ == ==]/.::::::;;;:::::::::::::::;;;:::::::.\[=  == ]___|"; break;
+
+
+
+            case 5: art = @"
+              |    |    |                 
+             )_)  )_)  )_)              
+            )___))___))___)\            
+           )____)____)_____)\\
+         _____|____|____|____\\\__
+---------\                   /---------
+  ^^^^^ ^^^^^^^^^^^^^^^^^^^^^
+    ^^^^      ^^^^     ^^^    ^^
+         ^^^^      ^^^"; break;
+
+            case 6: art = @"
+                        
+     /
+     \O        \
+   _ /`--|)---- \_ O__/
+   \`\          `\/_\
+  `` /_            \\
+                   ` \ 
+                     -'"; break;
         }
 
         if (center)
@@ -598,12 +675,16 @@ class Program
         }
         else
         {
+            int x = Console.CursorLeft; int y = Console.CursorTop;
             using StringReader reader = new StringReader(art);
             string? line;
+            int xIndent = Console.WindowWidth - art.Split('\n')[1].Length;
+            int yLevel = yIndent;
             while ((line = reader.ReadLine()) != null)
             {
-                Print(line);
+                Print(line, 0, xIndent, yLevel++);
             }
+            Console.SetCursorPosition(x, y);
         }
     }
     class Person
@@ -794,15 +875,6 @@ class Program
         MainConsole.Clear();
         gameStarted = DateTime.Now;
 
-        /* debug
-        AddToInventory("Gold", 100);
-        AddToInventory("Diamonds", 2);
-        AddToInventory("Sticks", 12);
-        AddToInventory("Rope", 12);
-        AddToInventory("Used TP", 1);
-        AddToInventory("Roblox gift card", 1);
-        */
-
         Prologue();
 
         ClearKeyBuffer();
@@ -827,6 +899,7 @@ class Program
         Person greg = new Person("Greg", ConsoleColor.Green, null); // "GregSpeak.wav"
 
         MainConsole.Clear();
+        DigArt(2);
         Narrate("17:23. Ocean Atlantic Cruise", 2);
         dave.Say("Ha, good one Greg!");
         greg.Say("I know right, I'm a real comedian!");
@@ -868,6 +941,7 @@ class Program
     static int Chapter1()
     {
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Beach Sounds.wav");
+        DigArt(2);
         Thread.Sleep(1000);
         Narrate("You awake.");
         Player.Say("Uhh... what happened?");
@@ -880,8 +954,9 @@ class Program
         int route = -1;
         int loops = 0;
 
-        while (loops < 3)
+        while (loops < 5)
         {
+            DigArt(2);
             Player.Say("What in the world should I do now?", 2);
 
             ClearKeyBuffer();
@@ -897,7 +972,7 @@ class Program
                     Narrate("You can't. It's midday.");
                     AddCharisma(-5);
                     break;
-                case 4: ViewStats(); ViewInventory(); break;
+                case 4: ViewStats(); ViewInventory(); loops--; break;
             }
             loops++;
         }
@@ -905,10 +980,16 @@ class Program
         Narrate("It's becoming night.");
         Player.Say("Oh gee golly gosh it sure is getting dark!");
         Player.Say("I'm gonna have to choose what to do...");
-        choices = Build("Stay at island bay", "Venture into the jungle");
-        // if they've found a diamond they gain access to the diamond / town route
-        choices = choices.Append(new ConsoleMessage("Shout 'I have a diamond'", ConsoleColor.Magenta)).ToArray();
-        route = Choose(choices);
+        if (ItemCount("Diamonds") > 0)
+        {
+            choices = Build("Shout 'I have a diamond'", "Venture into the jungle", "Stay at island bay");
+            route = Choose(choices) + 1;
+        }
+        else
+        {
+            choices = Build("Venture into the jungle", "Stay at island bay");
+            route = Choose(choices) + 2;
+        }
 
         return route;
     }
@@ -923,14 +1004,14 @@ class Program
         if (luck < 10)
         {
             int sticks = rand.Next(2, 6);
-            Narrate($"You find §(6){sticks} §(7)sticks.");
+            Narrate($"You find §(6){sticks} sticks§(7).");
             AddToInventory("Sticks", sticks);
             AddCharisma(1);
         }
         else if (luck < 40)
         {
             int coconuts = rand.Next(1, 4);
-            Narrate($"You found {coconuts} coconut{(coconuts != 1 ? "s" : "")}!");
+            Narrate($"You found §(10){coconuts} coconut{(coconuts != 1 ? "s" : "")}§(7)!");
             AddToInventory("Coconuts", coconuts);
             AddCharisma(10);
         }
@@ -938,7 +1019,7 @@ class Program
         {
             if (stats[0] < 20)
             {
-                Narrate("You find... used toilet paper?");
+                Narrate("You find... §(4)used toilet paper§(7)?");
                 AddToInventory("Used TP", 1);
                 AddCharisma(-1);
             }
@@ -951,7 +1032,7 @@ class Program
         else if (luck < 85)
         {
             int gold = rand.Next(10, 50);
-            Narrate($"You found {gold} gold!");
+            Narrate($"You found §(14){gold} gold§(7)!");
             AddToInventory("Gold", gold);
             AddCharisma(20);
         }
@@ -960,7 +1041,7 @@ class Program
             // 15% chance they get randomly sent on a random route:
             switch (rand.Next(0, 3))
             {
-                case 0: Narrate("You found a diamond!"); Route1(); break;
+                case 0: Narrate("You found a §(9)diamond§(7)!"); Route1(); break;
                 case 1: Route2(); break;
                 case 2: Route3(); break;
             }
@@ -985,6 +1066,7 @@ class Program
             dave.Say("And I'll leave as soon as I came.");
             Player.Say("Wait! Please help me out! I'm in dire need of your assistance!");
             dave.Say("Ugh okay, here's a §(9)diamond§(3).");
+            AddToInventory("Diamonds", 1);
             Narrate("§(13)Maybe someone will be interested in this...");
             RestoreCharisma();
             Player.Say("See you later Dave!");
@@ -996,7 +1078,7 @@ class Program
         {
             greg.Say($"Ugh what is it now, {Player.Name}.");
             Player.Say("Please help me get off this island, Greg!");
-            greg.Say("Ugh, fine. Get on the boat");
+            greg.Say("Ugh, fine. Get on the boat.");
             Narrate("Greg takes you back home.");
             Thread.Sleep(1000);
             throw new WonGameException(0);
@@ -1099,7 +1181,7 @@ class Program
             }
 
             Console.CursorVisible = true;
-            Print($"You have {5 - choices} choice{(choices == 4 ? "" : "s")} remaining. ", 2, 0, 0);
+            Print($"You have {4 - choices} choice{(choices == 4 ? "" : "s")} remaining. ", 2, 0, 0);
 
             int luck = rand.Next(0, 101);
             string item;
@@ -1146,7 +1228,7 @@ class Program
 
         Print($"You have 0 choices remaining.", 2, 0, 0);
         DrawDigGame(map, -1, -1);
-        if (diamond) { Narrate("§(13)Maybe someone will be interested in this diamond..."); }
+        if (diamond) { Narrate("§(13)Maybe someone will be interested in this diamond...", y:18); }
         Narrate("Press any key to continue.", 0, 0, 20);
         ClearKeyBuffer();
         Console.ReadKey();
@@ -1164,7 +1246,7 @@ class Program
         Person addison = new Person("Addison", ConsoleColor.DarkBlue, null);
         Person shaniece = new Person("Shaniece", ConsoleColor.DarkGreen, null);
         Person mackenzie = new Person("Mackenzie", ConsoleColor.DarkRed, null);
-        
+
         Player.Say("I have §(9)diamonds§(11)!");
         Thread.Sleep(1000);
         Narrate("The paparazzi appear, asking for your diamonds.");
@@ -1172,12 +1254,13 @@ class Program
         addison.Say($"WOW, {Player.Name.ToUpper()}, I LOVE YOU SO MUCH!");
         shaniece.Say($"You don't mind sharing do you?");
         mackenzie.Say($"Follow us, we'll give you whatever you want for your diamonds!");
-        Narrate("The ladies take you to their village");
+        Narrate("The ladies take you to their village.");
         Thread.Sleep(1000);
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Fuzzball Parade.mp3");
         ClearKeyBuffer();
         MainConsole.Clear();
 
+        DigArt(3);
         chanelle.Say($"Welcome to our village, {Player.Name}!");
         addison.Say("Have a look around!");
         shaniece.Say("Take a look at my hotel for a place to sleep at night.");
@@ -1189,11 +1272,12 @@ class Program
             LiveInVillage(); // otherwise stay on this route
         }
 
-        ConsoleMessage[] options = Build("Mackenzie's Shop", "Shaniece's Hotel", "View stats", "Search Further East");
+        ConsoleMessage[] options = Build("Mackenzie's Shop", "Shaniece's Hotel", "View Stats", "Search Further East");
         bool skipRamble = false; // cleans the transition to the east side
         bool finished = false;
         while (!finished)
         {
+            DigArt(3);
             if (!skipRamble) { Player.Say("What do I do now?"); }
             skipRamble = false;
             switch (Choose(options))
@@ -1344,7 +1428,7 @@ class Program
                     Player.Say("I already payed for it!");
                     chanelle.Say("Fine, fine, don't get your knickers in a twist.");
                     chanelle.Say("I've docked it at the island bay. Take it! I don't want it.");
-                    Narrate("Chanelle shuts the door on you");
+                    Narrate("Chanelle shuts the door on you.");
                     return true;
                 }
             }
@@ -1387,7 +1471,7 @@ class Program
 
                 case 1:
                     Narrate("You choose to hold onto your diamond.");
-                    chanelle.Say("Aw that's a real same. If you ever change your mind just come back!");
+                    chanelle.Say("Aw that's a real shame. If you ever change your mind just come back!");
                     Narrate("You leave the house.");
                     break;
             }
@@ -1397,10 +1481,9 @@ class Program
         return false;
     }
 
-    // also had pencil: 3 but removed for now
     static Tuple<ConsoleMessage, int>[][] shop = BuildShelves(NewShelf(NewItem("Bunch o' bananas", 5), NewItem("Teddy bear", 10), NewItem("Shovel", 20)),
                                                              NewShelf(NewItem("Roblox gift card", 100), NewItem("Paper", 3), NewItem("Rope", 5)),
-                                                             NewShelf(NewItem("Diamond", 999), NewItem("Pencil", 3), NewItem("Sticks", 1)));
+                                                             NewShelf(NewItem("Diamonds", 999), NewItem("Pencil", 3), NewItem("Sticks", 1)));
     static void Shop(bool villageRoute)
     {
         MainConsole.Clear();
@@ -1596,13 +1679,13 @@ class Program
         {
             shaniece.Say("Welcome to my hotel.");
             shaniece.Say("Would you like to book a room?");
-            shaniece.Say("It's 25 gold for one night.");
+            shaniece.Say("It's §(14)25 gold §(2)for one night.");
             Narrate("Book the night for 25 gold?");
             switch (Choose(Build("Yes, book the night", "No, not tonight")))
             {
                 case 0:
                     int money = Buy(25);
-                    if (money > 0) { Player.Say($"Oh, nevermind. I only have {money} gold."); }
+                    if (money > 0) { Player.Say($"Oh, nevermind. I only have §(14){money} gold§(11)."); }
                     else { shaniece.Say("Thank you. Come in whenever you like."); AddToInventory("Hotel Pass", 1); }
                     break;
                 case 1: shaniece.Say("Come again soon!"); break;
@@ -1610,12 +1693,12 @@ class Program
         }
         else
         {
-            shaniece.Say($"Would you like to check in for the night, §(11){Player.Name}§(2)?");
+            shaniece.Say($"Would you like to check in for the night, {Player.Name}?");
             switch (Choose(Build("Yes, stay the night", "No, come back later")))
             {
                 case 0:
                     Narrate("You go to bed.");
-                    Narrate("Getting a good nights sleep helps you feel better");
+                    Narrate("Getting a good nights sleep helps you feel better.");
                     RestoreCharisma();
                     knowledge.Add("Been to bed");
                     break;
@@ -1680,9 +1763,10 @@ class Program
         
         Player.Say("Huzzah! I have bested the map!");
         Player.Say("There it is—Great Britian.");
-        Player.Say("They sure were right in calling it great");
-        Narrate("You found your way home");
+        Player.Say("They sure were right in calling it great.");
+        Narrate("You found your way home.");
         Narrate("The end...", sleep:300);
+        Thread.Sleep(1000);
         throw new WonGameException(1);
     }
     static void SearchForTreasure()
@@ -1755,7 +1839,7 @@ class Program
                 case "Roblox gift card":
                     Narrate("You administer the Roblox gift card to the leak, tears in your eyes.");
                     Player.Say("I payed for those Robux.");
-                    Narrate("You begin crying. Miraculously, the Roblox gift card fixes the leak!");
+                    Narrate("Miraculously, the Roblox gift card fixes the leak!");
                     sticksApplied = true; ropeApplied = true;
                     break;
                 case "Used TP":
@@ -1800,7 +1884,7 @@ class Program
         if (ItemCount("Shovel") < 0 && ItemCount("Sticks") < 0)
         {
             Player.Say("But I have nothing to dig it up with...");
-            Player.Say("I guess I'll have to forage for sticks");
+            Player.Say("I guess I'll have to forage for sticks.");
             while (!inventory.ContainsKey("Sticks"))
             {
                 Choose(Build("Forage for sticks"));
@@ -1866,14 +1950,15 @@ class Program
     static void LiveInVillage()
     {
         AddToInventory("Gold", 50);
-        Narrate("The council kindly give you 50 gold to help you begin your endeavours in the village.");
+        Narrate("The council kindly give you §(14)50 gold §(7)to help you begin your endeavours in the village.");
         int initGold = ItemCount("Gold");
-        ConsoleMessage[] options = Build("Mackenzie's Shop", "Shaniece's Hotel", "View chores", "Search Further North");
+        ConsoleMessage[] options = Build("Mackenzie's Shop", "Shaniece's Hotel", "View Chores", "View stats");
         List<string> chores = new() { "Buy groceries", "Go to bed", "Restore charisma", "Pay taxes" };
         bool skipRamble = false; // cleans the transition to the east side
         bool finished = false;
         while (!finished)
         {
+            DigArt(3);
             if (!skipRamble) { Player.Say("What do I do now?"); }
             skipRamble = false;
             switch (Choose(options))
@@ -1988,7 +2073,7 @@ class Program
         Narrate("You did it! In the nick of time aswell!");
         Narrate("You continued to run for the rest of all eternity.");
         Narrate("You were never caught. Not ever.");
-        Narrate("The end", sleep: 300);
+        Narrate("The end.", sleep: 300);
         knowledge.Add("Evaded taxes");
         throw new WonGameException(1);
     }
@@ -2003,7 +2088,8 @@ class Program
             MainConsole.Clear();
             AudioPlaybackEngine.Instance.PlaySound(new CachedSound(@"Sounds\Crash.mp3"), true);
             AudioPlaybackEngine.Instance.ResumeLoopingMusic();
-            CenterText(new ConsoleMessage[] { "You died..." });
+            ClearKeyBuffer();
+            CenterText(Build("You died..."));
             throw new NewGameException();
         }
     }
@@ -2064,7 +2150,7 @@ class Program
 
         Player.Say("Wait-wait-wait-wait.");
 
-        if (Choose(Build("Battle for the monkey throne?", "No... maybe later.")) == 1)
+        if (Choose(Build("Battle for the monkey throne?", "No... maybe later.")) == 0)
         {
             AudioPlaybackEngine.Instance.StopLoopingMusic();
             MainConsole.Clear();
@@ -2076,7 +2162,7 @@ class Program
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Winner Winner.mp3");
         walt.Say("Ooo-oo Aaa-aaa! (Thank you for playing with us!)");
         craig.Say("Aaa-aa Ee-eee! (We will go home now!)");
-        Narrate("The end", sleep: 500);
+        Narrate("The end.", sleep: 500);
         Thread.Sleep(1000);
         throw new WonGameException(2);
     }
@@ -2176,8 +2262,7 @@ class Program
         Print("§(4)1 ", 0); Thread.Sleep(1000);
         Print("§(10)GO! ", 2);
         ClearKeyBuffer();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captian Trillian.mp3");
-        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captian Trillian.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captain Trillian.mp3");
         while (playerPos > 0)
         {
             MainConsole.Refresh(); // deletes everything, then rewrites only the logged messages.
@@ -2198,7 +2283,7 @@ class Program
 
         AudioPlaybackEngine.Instance.StopLoopingMusic();
         MainConsole.Clear();
-        Print("§(10)FINISH!", y: 20);
+        Print("§(10)FINISH!");
 
         if (monkeyPos1 == 0 || monkeyPos2 == 0)
         {
@@ -2222,7 +2307,7 @@ class Program
         Player.Say("Well I was actu-");
         king.Say("SILENCE!", sleep: 20);
         Thread.Sleep(500);
-        king.Say("You will battle me, and then we shall see who has the stronger wit!");
+        king.Say("You will battle me, and then we shall see who has the stronger wit!", 2);
         
         int roundsWon = 0;
         king.Say("Nobody's ever drawn blood from me and nobody ever will.");
@@ -2265,7 +2350,7 @@ class Program
             king.Say("Ugh, cheater! Nobody beats me!", 2);
             king.Say("Guards, take this imbecile to the volcano!", 2);
             Player.Say("YOU WHA");
-            Console.Clear();
+            MainConsole.Clear();
             AudioPlaybackEngine.Instance.StopLoopingMusic();
             Volcano();
         }
@@ -2313,6 +2398,7 @@ class Program
         Narrate("You, however, went on to lead the monkeys to an unstoppable empire.");
         Narrate("As for all the other monkeys, they loved their new king.");
         Narrate("The end.", sleep: 300);
+        Thread.Sleep(1500);
         throw new WonGameException(2);
     }
     static void MonkeyChase()
@@ -2334,7 +2420,7 @@ class Program
         Narrate("You did it! In the nick of time aswell!");
         Narrate("You continued to run for the rest of all eternity.");
         Narrate("You were never caught. Not ever.");
-        Narrate("The end", sleep: 300);
+        Narrate("The end.", sleep: 300);
         throw new WonGameException(2);
     }
 
@@ -2346,7 +2432,7 @@ class Program
         Person captain = new Person("Captain Blackbeard", ConsoleColor.DarkRed, null);
         Person carl = new Person("Stinkin' Carl", ConsoleColor.DarkGreen, null);
 
-        Narrate("A pirate ship approches!");
+        Narrate("A pirate ship approaches!");
         captain.Say("LAND HO!");
         captain.Say("Ahoy, me hearties!");
         carl.Say("Make way for the captain!");
@@ -2400,7 +2486,8 @@ class Program
         Thread.Sleep(1000);
 
         captain.Say("NOW CLIMB THE RIGGING!");
-        Narrate("That was a bit mean.");
+        Narrate("What the captain said about your speed really hurt your feelings.");
+        Narrate("Are you going to allow his bullying to continue?");
 
         if (Choose(Build("Climb the rigging", "No, fight the pirates")) == 1)
         {
@@ -2580,7 +2667,7 @@ class Program
         Print("§(4)1 ", 0); Thread.Sleep(1000);
         Print("§(10)GO! ", 2);
         ClearKeyBuffer();
-        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captian Trillian.mp3");
+        AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Adventures Of Captain Trillian.mp3");
         while (player > 0)
         {
             MainConsole.Refresh(); // deletes everything, then rewrites only the logged messages.
@@ -2713,8 +2800,8 @@ class Program
         AudioPlaybackEngine.Instance.PlayLoopingMusic(@"Music\Bushwick Tarantella.mp3");
         MainConsole.Clear();
 
-        
 
+        DigArt(6, 0, 4);
         carl.Say("This is the end for you, you gutter-crawling cur!");
         DrawHealth();
         weapons = ConvertStringArray(inventory.Keys.ToArray());
